@@ -1,0 +1,15 @@
+{
+  "name": "@beelicious/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@beelicious/database": "0.1.0",
+    "@beelicious/shared": "0.1.0",
+    "fastify": "5.12.7",
+    "zod": "4.6.7"
+  }
+}

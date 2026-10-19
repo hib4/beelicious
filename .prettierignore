@@ -1,0 +1,9 @@
+node_modules
+dist
+coverage
+packages/database/src/generated
+package-lock.json
+DESIGN.md
+.codex
+.gemini
+.impeccable

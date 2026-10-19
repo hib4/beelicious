@@ -1,0 +1,2 @@
+-- Phase 1 baseline: deliberately no business tables.
+-- Prisma records this migration in its own _prisma_migrations table.
