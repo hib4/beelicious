@@ -10,3 +10,6 @@ packages/database/src/generated/
 .codex/
 .gemini/
 .impeccable/
+
+# Local WhatsApp linked-device credentials and other private runtime data.
+.local/

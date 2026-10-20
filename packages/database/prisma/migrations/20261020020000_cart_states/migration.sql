@@ -1,0 +1,12 @@
+-- Commit enum additions before constraints use the new values.
+ALTER TYPE "ConversationState" ADD VALUE 'SELECT_QUANTITY';
+ALTER TYPE "ConversationState" ADD VALUE 'CART_ACTION';
+ALTER TYPE "ConversationState" ADD VALUE 'CART_REVIEW';
+ALTER TYPE "ConversationState" ADD VALUE 'CART_EDIT_QUANTITY';
+ALTER TYPE "ConversationState" ADD VALUE 'CART_EDIT_QUANTITY_INPUT';
+ALTER TYPE "ConversationState" ADD VALUE 'CART_REMOVE_ITEM';
+ALTER TYPE "ConversationState" ADD VALUE 'CART_READY';
+ALTER TYPE "ConversationState" ADD VALUE 'CART_CONFIRM_CLEAR';
+ALTER TYPE "ConversationState" ADD VALUE 'CART_CONFIRM_SWITCH';
+ALTER TYPE "ConversationState" ADD VALUE 'CART_CONFIRM_REOPEN';
+ALTER TYPE "ConversationState" ADD VALUE 'CART_CONFIRM_PRICE';

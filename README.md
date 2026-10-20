@@ -1,16 +1,12 @@
-# Beelicious
+# Beelicious 🐝
 
-Phase 1 foundation for a WhatsApp food ordering platform: a TypeScript modular monolith with a Fastify API and PostgreSQL/Prisma infrastructure. Warung Babe is the planned pilot tenant. Business features and WhatsApp integration are deliberately deferred.
+A WhatsApp-based food ordering platform. Customers can browse tenants and menus, manage a cart, select pickup times, and complete checkout using simulated or Midtrans Sandbox payments.
 
-## Prerequisites
+**Stack:** TypeScript, Node.js, Fastify, PostgreSQL, Prisma, Zod, Vitest, and npm workspaces. Baileys is the current development messaging provider; Meta Cloud API and Mock remain supported.
 
-- Node.js 24 LTS (`.nvmrc` pins 24.22.0), npm 11, and optionally nvm.
-- Docker with Docker Compose and a running Docker engine.
-- Available local ports 3000 (API) and 5432 (PostgreSQL).
+## Quick start
 
-## Install and configure
-
-Run commands from the repository root:
+Requires Node.js 24 (`.nvmrc`), npm 11, and Docker Compose.
 
 ```bash
 nvm install
@@ -18,49 +14,103 @@ nvm use
 cp .env.example .env
 ```
 
-Edit `.env` before continuing. Replace the password placeholder in both `POSTGRES_PASSWORD` and `DATABASE_URL` with the same strong local-only password. URL-encode special characters in the URL password. Do not commit this file. All other example values work for a local installation.
+In `.env`, replace `POSTGRES_PASSWORD` and the password in `DATABASE_URL` with the same local password. URL-encode special characters in the connection URL. Then run:
 
 ```bash
 npm ci
 docker compose up -d --wait
 npm run db:migrate
+npm run db:seed
 npm run dev
 ```
 
-`npm ci` generates Prisma Client and builds the two library packages through the root prepare script. It does not require a running database or `.env`. The API and Prisma commands load the root `.env` without overriding environment variables already supplied by the shell. Docker Compose also reads that file. Do not run with placeholder credentials.
+The API runs at `http://127.0.0.1:3000`. `/health` checks the process; `/ready` checks PostgreSQL. Restart the API after changing configuration or shared/database packages.
 
-`npm run dev` builds the packages and watches API source files. Restart it after editing shared/database sources. Configuration defaults are development mode, port 3000, and host 127.0.0.1. `DATABASE_URL` is required; invalid configuration prevents startup and reports field names only. Override `HOST` when explicitly exposing the API beyond loopback.
+## WhatsApp development
 
-## Endpoints
+WhatsApp is disabled by default. To enable the full conversation flow with Baileys, configure `.env`:
 
-```bash
-curl -i http://127.0.0.1:3000/health
-curl -i http://127.0.0.1:3000/ready
+```dotenv
+NODE_ENV=development
+MESSAGING_PROVIDER=baileys
+WHATSAPP_ENABLED=true
+WHATSAPP_TEST_BOT_ENABLED=true
+CONVERSATION_ENABLED=true
+CHECKOUT_ENABLED=true
+BAILEYS_AUTH_DIR=./.local/baileys-auth
+BAILEYS_ALLOWED_TEST_CONTACTS=APPROVED_TEST_NUMBER
 ```
 
-- `/health`: HTTP 200, `{"status":"ok","service":"beelicious-api"}`. Does not query PostgreSQL.
-- `/ready`: real Prisma `SELECT 1`; HTTP 200 with status `ready` or HTTP 503 with status `unavailable`. Both include service `beelicious-api`. Failure responses contain no database details.
+Replace `APPROVED_TEST_NUMBER` with an international number containing digits only; separate multiple contacts with commas. Start the API, scan the terminal QR through WhatsApp **Linked Devices**, then send **Halo** from an approved separate WhatsApp account. Messages sent by the connected account are ignored.
 
-The API starts even when PostgreSQL is unavailable. Readiness retries on each request, with bounded connection/query timeouts, and recovers when the database returns. SIGINT/SIGTERM close HTTP connections and the database pool, with a ten-second shutdown deadline. Logs are structured JSON.
+Authentication persists in the ignored `.local/baileys-auth` directory, so valid sessions reconnect after restart without another scan. Never commit or share authentication files.
 
-## Commands
+| Provider    | Configuration                                                                                                |
+| ----------- | ------------------------------------------------------------------------------------------------------------ |
+| `baileys`   | Linked-device authentication and `BAILEYS_ALLOWED_TEST_CONTACTS`; no Meta credentials                        |
+| `cloud-api` | Meta credentials from `.env.example`, `WHATSAPP_TEST_RECIPIENTS`, and an HTTPS `/webhooks/whatsapp` callback |
+| `mock`      | `WHATSAPP_TEST_RECIPIENTS`; no external credentials, programmatic test injection                             |
 
-| Command                                    | Purpose                                                   |
-| ------------------------------------------ | --------------------------------------------------------- |
-| `npm run dev`                              | Build packages and watch API source                       |
-| `npm run build`                            | Generate client and compile all workspaces                |
-| `npm start`                                | Start compiled API after building                         |
-| `npm run typecheck`                        | Check application, package, test, and configuration types |
-| `npm run lint`                             | ESLint                                                    |
-| `npm run format`                           | Apply Prettier formatting                                 |
-| `npm run format:check`                     | Verify formatting                                         |
-| `npm test`                                 | Database-independent Vitest tests                         |
-| `npm run test:integration`                 | Real database readiness and refused-connection tests      |
-| `npm run db:generate`                      | Generate model-free Prisma Client                         |
-| `npm run db:migrate`                       | Apply checked-in migrations using migrate deploy          |
-| `npm run db:migrate:dev -- --name example` | Author future development migrations                      |
+Only the selected provider initializes. All providers share the same conversation and business logic.
 
-Run the quality checks:
+**Customer commands:** `Halo` / `Hi` / `Mulai`, `Menu`, `Keranjang`, `Kembali` / `0`, `Batal`, `Bantuan`, `CEK`, and `Kirim Ulang QR`. Follow numbered options; use `8` / `9` for pagination where shown. `Batal` preserves a browsing cart but requests cancellation while payment is pending.
+
+## Payments
+
+Checkout supports **Mock** and **Midtrans Sandbox** only. Production payment collection is disabled.
+
+For an actual Sandbox QRIS image delivered through Baileys:
+
+```dotenv
+PAYMENT_PROVIDER=midtrans
+MIDTRANS_ENVIRONMENT=sandbox
+MIDTRANS_SERVER_KEY=YOUR_SANDBOX_SERVER_KEY
+MIDTRANS_MERCHANT_ID=YOUR_MERCHANT_ID
+```
+
+Replace the placeholders with private Sandbox credentials. Configure `/webhooks/midtrans` on an HTTPS tunnel in the Sandbox dashboard, or optionally set `PAYMENT_WEBHOOK_URL` as an override. Authenticated status reconciliation also recovers missed notifications. Use Midtrans's Sandbox simulator, not actual funds. See the [Midtrans QRIS documentation](https://docs.midtrans.com/reference/qris).
+
+With `NODE_ENV=development`, initial QR captions and **Kirim Ulang QR** include the original Midtrans image URL. Paste that URL into the [Sandbox QRIS simulator](https://simulator.sandbox.midtrans.com/v2/qris/index), complete the simulated payment, then send **CEK**. WhatsApp media links cannot be used in the simulator.
+
+Customer messages show normal QRIS checkout wording, order total, expiry, and payment commands. Payment is confirmed only after provider verification; sending a QR image or receiving a customer message is not proof of payment.
+
+Switching providers or merchant credentials does not migrate existing payments. Resolve an old checkout through its original provider before starting another; `Menu` still permits catalog browsing. Overdue or cancellation-pending payments show verification status and do not offer QR resend. An overdue timestamp alone never releases the pickup reservation.
+
+Without credentials, use `PAYMENT_PROVIDER=mock`. It displays an explicitly non-payable placeholder and supports local payment simulation:
+
+```bash
+npm run payment:inspect
+npm run payment:mock -- MOCK_PROVIDER_REFERENCE settlement
+# Other outcomes: deny, expire
+```
+
+Copy the reference from inspection output. Simulation controls are development-only local commands, never public endpoints. `npm run whatsapp:events` inspects messaging processing state.
+
+## Catalog and pickup
+
+The idempotent development seed creates **Warung Babe**, categories **Makanan** / **Minuman**, and two prototype items: **Nasi Goreng Spesial — Rp20,000** and **Es Teh Manis — Rp5,000**. Example operating hours are daily **07.00–18.00 WIB**. These are unverified development fixtures, not a production merchant catalog or schedule; repeated seeds preserve existing edits.
+
+Defaults in `.env.example`: 20 units per cart item, 30-minute pickup slots, five orders per slot, 60-minute lead time, seven-day booking window, and 15-minute requested payment expiry. Times display in `Asia/Jakarta`; timestamps persist in UTC. Prices and totals use integer Rupiah.
+
+Carts, conversations, orders, payments, and pickup reservations persist in PostgreSQL. **READY** means a saved cart, not an order. Explicit checkout confirmation freezes the cart and reserves pickup capacity. Uncertain payments retain their reservation until verified resolution; duplicate events do not repeat checkout mutations or create another charge. Payment confirmation does not mean food is ready for pickup.
+
+## API
+
+Public catalog endpoints are read-only and expose active, available resources:
+
+```text
+GET /health
+GET /ready
+GET /api/v1/tenants
+GET /api/v1/tenants/:tenantId
+GET /api/v1/tenants/:tenantId/categories
+GET /api/v1/tenants/:tenantId/menu?categoryId=UUID
+GET /api/v1/tenants/:tenantId/menu/:menuItemId
+```
+
+Provider webhooks: `GET/POST /webhooks/whatsapp` for Cloud API and `POST /webhooks/midtrans` for Midtrans. There are no public administrative, customer, cart, or arbitrary-send endpoints.
+
+## Development and tests
 
 ```bash
 npm run typecheck
@@ -68,42 +118,30 @@ npm run lint
 npm run format:check
 npm test
 npm run build
-npm run test:integration
-```
-
-Integration tests require the configured PostgreSQL database. They do not silently skip missing services and do not create business data. To run the compiled application:
-
-```bash
-npm run build
 npm start
 ```
 
-For a manual outage check, keep the API running, run `docker compose stop postgres`, and request both endpoints. Health remains 200 and readiness becomes 503. Run `docker compose start postgres` and retry readiness after PostgreSQL is healthy; it returns 200. Stop the API with Ctrl+C. `docker compose down` stops local services and preserves the named volume; avoid `down -v` unless deliberately deleting local data.
+Unit tests require no external services. For integration tests, create the separate database once, then migrate it and run the suite:
 
-## Project layout and decisions
-
-```text
-apps/api/
-  src/                 # app construction, environment parser, server lifecycle
-  test/                # unit and explicit integration tests
-packages/database/
-  prisma/              # model-free schema and initial migration
-  prisma.config.ts     # CLI configuration and root environment loading
-  src/                 # database factory; ignored generated client
-packages/shared/src/   # shared response types
-scripts/               # root environment loader
+```bash
+docker compose exec -T postgres sh -c 'createdb -U "$POSTGRES_USER" "${POSTGRES_DB}_test"'
+npm run db:migrate:test
+npm run test:integration
 ```
 
-ESM workspaces resolve through compiled package exports, not TypeScript aliases. Libraries build before the API. All packages are private. There is one PostgreSQL service and no extra application or infrastructure service. Prisma 7 uses its TypeScript client generator and PostgreSQL adapter. The initial migration deliberately creates no business tables; Prisma creates its own migration history. Later phases add domain models through new migrations. See `AGENTS.md` for development boundaries.
+The test database defaults to `DATABASE_URL` plus `_test`; override with `WHATSAPP_TEST_DATABASE_URL`. Integration tests require PostgreSQL and mock all WhatsApp/payment network calls. `npm run db:migrate:dev -- --name CHANGE_NAME` authors new development migrations; never edit applied migrations or reset existing data casually.
 
-## Troubleshooting
+## Architecture and limitations
 
-- **Docker connection error:** start Docker Desktop or the selected engine, then run `docker info` and retry Compose.
-- **Port already allocated:** stop the conflicting service. For another database port, update both the Compose port mapping and `DATABASE_URL`; for the API, change `PORT`.
-- **Environment validation error:** check the named field in root `.env`; port must be an integer from 1–65535 and the URL must use `postgres:` or `postgresql:`. Shell environment variables take precedence over `.env`.
-- **Database authentication failure:** confirm URL and Compose credentials match. PostgreSQL initializes users/passwords only on the first creation of its data volume; editing `.env` does not change an existing database password. Update the existing database deliberately rather than deleting its volume.
-- **Readiness 503:** confirm `docker compose ps` shows healthy PostgreSQL, migrations applied, and the API URL points to the published local port. The API runs on the host; use `127.0.0.1`, not the Compose service name.
-- **Missing generated client/package output:** run `npm run build:packages`. If lifecycle scripts were disabled during installation, this step is required. Verify the pinned Node version and reinstall with `npm ci` if necessary.
-- **Migration drift:** do not edit the baseline or reset an existing database automatically. Inspect migration status and create a new migration for intended changes. `migrate dev` needs a development user able to create a shadow database; the local Compose user supports that.
+```text
+apps/api/             HTTP, messaging, conversations, catalog, cart, checkout
+packages/database/    Prisma schema, migrations, seeds, and connections
+packages/shared/      Reusable types and pure utilities
+```
 
-No WhatsApp webhooks, tenant/menu data, ordering, payments, authentication, UI, AI features, or production deployment are implemented in Phase 1.
+The modular monolith uses PostgreSQL transactions, scoped identities, deduplication, and durable processing. Ambiguous external sends are not automatically replayed; exactly-once WhatsApp delivery is not guaranteed. See [AGENTS.md](AGENTS.md) for engineering rules and the [Prisma schema](packages/database/prisma/schema.prisma) for data models.
+
+- Baileys is unofficial, development-only, and carries account-restriction risk.
+- Live Baileys QRIS delivery and Midtrans Sandbox end-to-end checkout remain unverified until tested with a real device and Sandbox account.
+- No production collection, automatic refunds, payouts, dashboards, authentication, or tenant fulfillment notifications are implemented. Uncertain payments may require manual investigation.
+- Keep `.env`, credentials, and session data private. Preserve database volumes and payment history; avoid `docker compose down -v`.

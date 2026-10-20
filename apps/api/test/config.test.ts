@@ -7,6 +7,7 @@ it('applies defaults and coerces a valid port', () => {
   expect(parseEnvironment({ ...valid, PORT: '4000' })).toEqual({
     ...valid,
     NODE_ENV: 'development',
+    CART_MAX_ITEM_QUANTITY: 20,
     PORT: 4000,
     HOST: '127.0.0.1',
   });

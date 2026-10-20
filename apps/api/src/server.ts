@@ -1,9 +1,19 @@
 import { buildApp } from './app.js';
 import { parseEnvironment } from './config.js';
+import qrcode from 'qrcode-terminal';
 
 async function main() {
   const config = parseEnvironment(process.env);
-  const app = buildApp(config);
+  const app = buildApp(config, undefined, {
+    ...(process.stdout.isTTY
+      ? {
+          qr: (value: string) => {
+            // Pairing material goes only to an interactive local terminal, never JSON logs.
+            qrcode.generate(value, { small: true });
+          },
+        }
+      : {}),
+  });
   let closing = false;
   async function shutdown(exitCode: number) {
     if (closing) return;

@@ -26,11 +26,19 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "db:generate": "npm run generate -w @beelicious/database",
     "db:migrate": "npm run migrate -w @beelicious/database",
-    "db:migrate:dev": "npm run migrate:dev -w @beelicious/database --"
+    "db:migrate:dev": "npm run migrate:dev -w @beelicious/database --",
+    "db:migrate:test": "node scripts/migrate-test-database.mjs",
+    "whatsapp:send": "node --import ./scripts/load-env.mjs --import tsx apps/api/src/modules/whatsapp/send-cli.ts",
+    "whatsapp:events": "node --import ./scripts/load-env.mjs --import tsx apps/api/src/modules/whatsapp/events-cli.ts",
+    "db:seed": "npm run seed -w @beelicious/database",
+    "payment:mock": "node --import ./scripts/load-env.mjs --import tsx apps/api/src/modules/checkout/mock-cli.ts",
+    "payment:inspect": "node --import ./scripts/load-env.mjs --import tsx apps/api/src/modules/checkout/inspect-cli.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@types/node": "^24.0.0",
+    "@types/proper-lockfile": "4.1.4",
+    "@types/qrcode-terminal": "0.12.2",
     "eslint": "10.13.0",
     "prettier": "3.9.10",
     "tsx": "4.23.15",
