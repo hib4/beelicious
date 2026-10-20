@@ -1,3 +1,8 @@
+import { createCatalogServices } from './modules/catalog/services.js';
+import {
+  registerCatalogRoutes,
+  type CatalogReader,
+} from './modules/catalog/routes.js';
 import Fastify, { type FastifyServerOptions } from 'fastify';
 import {
   createWhatsAppClient,
@@ -16,6 +21,7 @@ import type {
 import {
   createDatabase,
   type Database,
+  type ApplicationDatabase,
   type WhatsAppDatabase,
   type WhatsAppEventStore,
 } from '@beelicious/database';
@@ -23,6 +29,7 @@ import type { HealthResponse, ReadinessResponse } from '@beelicious/shared';
 import type { Config } from './config.js';
 
 export interface AppDependencies {
+  catalogServices?: CatalogReader;
   whatsappEvents?: WhatsAppEventStore;
   messagingAdapterFactory?: (
     callbacks: AdapterCallbacks,
@@ -63,6 +70,11 @@ export function buildApp(
             },
           },
   });
+  const prisma = (database as Partial<ApplicationDatabase>).prisma;
+  const catalog =
+    dependencies.catalogServices ??
+    (prisma ? createCatalogServices(prisma) : undefined);
+  app.register(async (scope) => registerCatalogRoutes(scope, catalog));
   let worker: ReturnType<typeof createWorker> | undefined;
   let messaging: MessagingRuntime | undefined;
   if (config.whatsapp) {

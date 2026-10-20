@@ -1,6 +1,6 @@
 # Beelicious
 
-Phase 2B adds selectable Cloud API, Baileys, and mock messaging providers to the TypeScript/Fastify modular monolith. The official Meta WhatsApp Cloud API implementation remains available. PostgreSQL backs durable webhook receipt and processing. Warung Babe remains the planned pilot; tenant/menu/cart/order/payment functionality is not implemented.
+Phase 3 adds tenant, menu catalog, and customer identity services to the TypeScript/Fastify modular monolith. Baileys is the current development messaging provider; the official Meta Cloud API and mock providers remain available. PostgreSQL backs catalog data and the unchanged durable messaging inbox. Ordering, carts, and payments are not implemented.
 
 ## Prerequisites
 
@@ -72,7 +72,7 @@ npm run build
 npm run test:integration
 ```
 
-Integration tests require the configured PostgreSQL database and a separate WhatsApp integration database. They fail visibly when a required service or migration is missing. They mock every Meta HTTP request and create only synthetic infrastructure events in the test database. To run the compiled application:
+Integration tests require the configured PostgreSQL database and a separate WhatsApp integration database. They fail visibly when a required service or migration is missing. They mock every WhatsApp transport and create only suite-owned synthetic inbox and domain fixtures in the test database. To run the compiled application:
 
 ```bash
 npm run build
@@ -88,14 +88,14 @@ apps/api/
   src/                 # app construction, environment parser, server lifecycle
   test/                # unit and explicit integration tests
 packages/database/
-  prisma/              # model-free schema and initial migration
+  prisma/              # schema and additive infrastructure/catalog migrations
   prisma.config.ts     # CLI configuration and root environment loading
   src/                 # database factory; ignored generated client
 packages/shared/src/   # shared response types
 scripts/               # root environment loader
 ```
 
-ESM workspaces resolve through compiled package exports, not TypeScript aliases. Libraries build before the API. All packages are private. There is one PostgreSQL service and no extra application or infrastructure service. Prisma 7 uses its TypeScript client generator and PostgreSQL adapter. The unchanged initial migration creates no business tables. The additive Phase 2 migration adds only `WhatsAppEvent`, the durable integration inbox. Later phases add domain models through new migrations. See `AGENTS.md` for development boundaries.
+ESM workspaces resolve through compiled package exports, not TypeScript aliases. Libraries build before the API. All packages are private. There is one PostgreSQL service and no extra application or infrastructure service. Prisma 7 uses its TypeScript client generator and PostgreSQL adapter. The unchanged initial migration creates no business tables. The additive Phase 2 migration adds only `WhatsAppEvent`, the durable integration inbox. The additive Phase 3 migration adds tenant/catalog/customer models and constraints without changing the inbox. See `AGENTS.md` for development boundaries.
 
 ## Troubleshooting
 
@@ -277,6 +277,95 @@ npm run test:integration
 
 Unit tests use injected socket/auth implementations, never live WhatsApp. Database-connected tests use the existing separate `_test` database and mock all transports, including Baileys' real adapter with an injected socket. They cover concurrent duplicates, account/provider isolation, legacy Cloud rows, restart/lease recovery, ambiguous sends, normalization, filtering, QR handling, auth corruption/restoration, bounded reconnects, and shutdown.
 
-**Live status: unverified.** No real-device QR pairing, inbound reception, phone delivery, or session restoration has been demonstrated by automated tests. Repeat the manual checklist above with an approved device; also confirm Cloud callback/delivery separately once Meta account access is restored. Phase 3 has not started.
+**Live status:** real-device Baileys pairing and greeting reception/reply were user-confirmed before Phase 3. Post-change live delivery and restart restoration have not been reverified; automated tests do not prove live connectivity. Repeat the manual checklist above, and confirm Cloud callback/delivery separately once Meta account access is restored.
 
 References: [Baileys v7 migration](https://baileys.wiki/migration/v7), [session management](https://baileys.wiki/authentication/session-management), [sending text](https://baileys.wiki/messaging/sending-messages), and [versioned upstream example](https://github.com/WhiskeySockets/Baileys/blob/v7.0.0-rc14/Example/example.ts).
+
+## Phase 3: tenants, catalog, and customers
+
+The API owns `TenantService`, `MenuCategoryService`, `MenuService`, and `CustomerService`. They use the application's existing Prisma client/pool through the database package's public exports. All writes validate strict Zod inputs and translate persistence failures into sanitized domain errors. Administrative writes remain internal; there are no public write or customer endpoints.
+
+### Models and integrity
+
+| Model                     | Fields and relationships                                                                                                      |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Tenant                    | UUID ID, unique lowercase slug, name, optional description/logo URL, isActive, timestamps                                     |
+| MenuCategory              | UUID ID, tenantId, name, optional description, sortOrder, isActive, timestamps                                                |
+| MenuItem                  | UUID ID, tenantId, categoryId, name, optional description/image URL, integer Rupiah price, isAvailable, sortOrder, timestamps |
+| Customer                  | UUID internal ID, optional displayName, timestamps                                                                            |
+| CustomerMessagingIdentity | UUID ID, customerId, provider, accountId, providerUserId, identifierType, nullable phoneNumber, timestamps                    |
+
+A tenant has many categories and items; each item references exactly one category. The composite foreign key `(tenantId, categoryId)` references category `(tenantId, id)`, so direct database writes cannot connect an item to another tenant's category. PostgreSQL also enforces nonnegative prices with `MenuItem_price_nonnegative`; services accept only integer values from 0 through 2,147,483,647 Rupiah. Zero-priced items are allowed. Ordering uses sortOrder followed by UUID ID for ties. Category and item names may repeat.
+
+Tenant, category, customer, and identity foreign keys use `RESTRICT` for updates/deletes. There are no deletion services. Deactivate tenants/categories and change item availability for ordinary operations. A tenant/category with dependent rows or customer with identities cannot be deleted directly without deliberate child cleanup. UUID IDs and tenant ownership cannot be changed through services.
+
+### Customer identity rules
+
+Customers are platform-wide, independent of any provider and tenant. An identity is unique within `(provider, accountId, providerUserId)`. Account scope comes from the existing normalized message envelope and prevents accidental linking across connected accounts. Use `senderId` as providerUserId, not messageId or a guessed phone number. Supported identifier types are Baileys `jid`/`lid`, Cloud API `cloud-user`, and mock `mock-user`; a database CHECK enforces valid provider/type combinations.
+
+`CustomerService.register(identity, displayName?)` atomically creates a customer and its identity; concurrent requests for the same identity return the same customer and do not leave orphan rows. `findByIdentity` and `getById` support future conversation logic. A PN JID and LID remain distinct even if they appear to refer to one person. Switching providers may initially create a separate customer until reliable ownership verification explicitly links the identities.
+
+`associateIdentity({ verified: true, customerId, identity })` is a trusted internal contract: its caller must have independently verified ownership of that exact identity for that customer. The boolean is not an authentication mechanism. This phase implements no verification workflow and exposes no way for HTTP callers or incoming messages to invoke it. Association never transfers an existing identity to another customer or merges customers. Concurrent repeated association is idempotent.
+
+No customer registration is wired into messaging in Phase 3. The adapters, normalized envelope, and greeting remain unchanged. Services never infer or populate phoneNumber from opaque identifiers; the nullable column is reserved for future verified, necessary data. Customer and identity records are never included in public catalog responses or application logs.
+
+### Migrations and development seed
+
+Run from the repository root:
+
+```bash
+npm run db:generate
+npm run db:migrate
+# Requires NODE_ENV=development and the existing DATABASE_URL:
+npm run db:seed
+# Safe to repeat; existing values are preserved:
+npm run db:seed
+```
+
+The seed is explicit (`prisma db seed` via Prisma 7 configuration), never part of application startup, installation, or migration deployment. Its CLI rejects production/test environments and reports sanitized failures. The reusable seed function is exercised directly against the isolated test database. A transaction-scoped PostgreSQL advisory lock serializes simultaneous fixture seeds; fixed UUIDs and upserts prevent duplicates. Existing names, prices, availability, and other edits are preserved. Conflicting reserved IDs or an existing `warung-babe` slug owned by another ID cause a rollback instead of overwriting data. Do not rename seed identifiers without a deliberate data transition.
+
+| Tenant                      | Category | Prototype item      | Price    |
+| --------------------------- | -------- | ------------------- | -------- |
+| Warung Babe (`warung-babe`) | Makanan  | Nasi Goreng Spesial | Rp20,000 |
+| Warung Babe (`warung-babe`) | Minuman  | Es Teh Manis        | Rp5,000  |
+
+Description: **Indonesian food tenant for the Beelicious pilot.** These two entries are development examples, not a verified production catalog. No other prices, menus, or operational details are asserted.
+
+### Public catalog API
+
+| GET endpoint                                     | Result                                                 |
+| ------------------------------------------------ | ------------------------------------------------------ |
+| `/api/v1/tenants`                                | Active tenants, ordered by name then ID                |
+| `/api/v1/tenants/:tenantId`                      | Active tenant details                                  |
+| `/api/v1/tenants/:tenantId/categories`           | Active categories, ordered by sortOrder then ID        |
+| `/api/v1/tenants/:tenantId/menu`                 | Available items in active categories                   |
+| `/api/v1/tenants/:tenantId/menu?categoryId=UUID` | Available items restricted to an owned active category |
+| `/api/v1/tenants/:tenantId/menu/:menuItemId`     | Owned available item in an active category             |
+
+Every public catalog route requires an active tenant. Missing, inactive, unavailable, and cross-tenant detail resources return 404. Invalid UUIDs/filters return 400; database failures return a sanitized 503. Success envelopes are `{ "data": [...] }` or `{ "data": { ... } }`; errors are `{ "error": { "code": "not_found", "message": "Resource not found" } }`. Explicit response schemas omit timestamps and internal active flags; item prices are integers and returned items have `isAvailable: true`. Lists are unpaginated for the pilot. There are no public customer endpoints, administrative writes, or arbitrary messaging sends.
+
+```bash
+curl http://127.0.0.1:3000/api/v1/tenants
+curl http://127.0.0.1:3000/api/v1/tenants/3b000000-0000-4000-8000-000000000001/categories
+curl http://127.0.0.1:3000/api/v1/tenants/3b000000-0000-4000-8000-000000000001/menu
+```
+
+Keep the ignored local `.env` on `MESSAGING_PROVIDER=baileys` for current development; no Meta credentials are needed. The backward-compatible provider default and the default-off messaging master switch remain intact. Switching to Cloud API or mock still follows the existing runbooks.
+
+### Testing and Phase 4 consumption
+
+```bash
+npm ci
+npm run typecheck
+npm run lint
+npm run format:check
+npm test
+npm run build
+npm run db:migrate
+npm run db:migrate:test
+npm run test:integration
+```
+
+Catalog integration tests reuse the separate migrated database ending in `_test`, selected by the existing WHATSAPP_TEST_DATABASE_URL override or derived from DATABASE_URL. They fail when the service/migrations are missing. Tests delete only their own fixture rows, never development data; reserved seed fixtures must not already exist in that test database. Tests cover database-level constraints, tenant isolation, concurrent registration/association, identity namespace separation, repeated/concurrent seeds, public visibility, and error responses. Existing messaging suites continue to mock WhatsApp transports.
+
+Phase 4 can inject the same TenantService and MenuService instances into provider-independent conversation logic: use `tenants.listActive()`, `categories.list(tenantId, true)`, `menu.available(tenantId, categoryId?)`, and `menu.get(tenantId, itemId, true)`. Recheck availability at future checkout; catalog reads are not inventory reservations or price guarantees. Future customer registration should use the normalized envelope and a verified identity-linking policy. No conversation states, cart, checkout, scheduling, payment, authentication, dashboard, or Phase 4 work is included here.
