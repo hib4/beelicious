@@ -7,9 +7,20 @@ coverage/
 packages/database/src/generated/
 *.tsbuildinfo
 .DS_Store
+.agents/
 .codex/
 .gemini/
 .impeccable/
 
 # Local WhatsApp linked-device credentials and other private runtime data.
 .local/
+
+# Frontend build and browser-test artifacts
+**/.next/
+**/out/
+**/playwright-report/
+**/test-results/
+**/next-env.d.ts
+
+# Local design audit captures
+.taste-skill/

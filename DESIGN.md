@@ -40,6 +40,18 @@ typography:
     fontWeight: 700
     lineHeight: 1.08
     letterSpacing: -1.68px
+  marketing-hero:
+    fontFamily: '"Plus Jakarta Sans", Inter, system-ui, sans-serif'
+    fontSize: "clamp(64px, 11.1vw, 192px)"
+    fontWeight: 800
+    lineHeight: 0.91
+    letterSpacing: -0.045em
+  marketing-heading:
+    fontFamily: '"Plus Jakarta Sans", Inter, system-ui, sans-serif'
+    fontSize: "clamp(48px, 7.8vw, 128px)"
+    fontWeight: 800
+    lineHeight: 0.98
+    letterSpacing: -0.045em
   display-lg:
     fontFamily: '"Plus Jakarta Sans", Inter, system-ui, sans-serif'
     fontSize: 40px
@@ -620,3 +632,13 @@ The structural breakpoints that matter most are 420px, 640px, 834px, 1024px, 120
 - Pickup times and order statuses are design examples until backed by actual scheduling rules and state transitions. Payment methods, delivery availability, and cancellation/refund handling are not defined here.
 - Merchant or admin dashboard components describe possible Beelicious-owned UI patterns, not evidence that each screen already exists.
 - Font rendering, reduced-motion behavior, and accessibility must be validated in implemented interfaces, especially at small screen widths.
+
+## Phase 7 editorial marketing application
+
+The approved redesign uses **Big Type. Bold Food. Playful Bee.** The shared brand palette, body/display font families, focus semantics, and operational component tokens remain intact. The marketing-specific `marketing-hero` and `marketing-heading` scale supersedes the original 56px landing-page suggestion only for expressive marketing scenes. On small phones the hero uses approximately 56–72px type with two authored lines. Body copy remains 16–18px and captions 14px; operational surfaces do not inherit a new typography requirement.
+
+The marketing page uses equal 24px outer gutters (20px phones, 16px small phones), a 1600px maximum frame, and distinct full-bleed charcoal, yellow, and parchment compositions. The original Bee-bot is enlarged and translated/rotated without facial changes or geometric deformation. No glossy effects, illustrative placeholder cards, decorative rules, or generic icon benefit rows are used. Pill actions retain the original action language; future operational cards retain their original radius tokens.
+
+Editorial food photographs are separate from the Warung Babe pilot spotlight. Local assets and licenses are documented in apps/web/ASSETS.md and credited in the footer. They are not merchant menu imagery or evidence of availability. The spotlight remains typographic until verified merchant assets exist.
+
+GSAP owns marketing transforms; CSS owns control feedback. One preview is pinned only on fine-pointer desktops at least 1024px wide and 720px tall with no reduced-motion preference. Six normal-flow narrative chapters determine progress. Phones, short screens, reduced motion, and missing JavaScript retain the complete readable inline story. No smooth-scroll interception or artificial payment controls are introduced.

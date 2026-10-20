@@ -5,5 +5,5 @@
     "checkJs": false
   },
   "include": ["apps/**/*.ts", "packages/**/*.ts", "vitest*.ts"],
-  "exclude": ["**/dist", "node_modules"]
+  "exclude": ["**/dist", "node_modules", "apps/web"]
 }

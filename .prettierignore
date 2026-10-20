@@ -7,3 +7,13 @@ DESIGN.md
 .codex
 .gemini
 .impeccable
+
+# Frontend build and browser-test artifacts
+**/.next/
+**/out/
+**/playwright-report/
+**/test-results/
+**/next-env.d.ts
+
+.agents
+.taste-skill

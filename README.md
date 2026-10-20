@@ -26,6 +26,33 @@ npm run dev
 
 The API runs at `http://127.0.0.1:3000`. `/health` checks the process; `/ready` checks PostgreSQL. Restart the API after changing configuration or shared/database packages.
 
+## Landing page
+
+The independent Next.js frontend runs at `http://127.0.0.1:3001`. The Fastify API remains on port 3000; either app can run separately.
+
+```bash
+cp apps/web/.env.example apps/web/.env.local
+npm run dev:web
+# Backend in another terminal, when needed:
+npm run dev
+```
+
+For invited pilot users, set `NEXT_PUBLIC_ORDERING_ENABLED=true` and `NEXT_PUBLIC_WHATSAPP_NUMBER` to the connected WhatsApp account's international number (digits only). Backend approved-contact restrictions still apply. Missing/invalid numbers or disabled ordering show **Segera Hadir**. Links prefill **Halo**; the website never sends messages itself. Public configuration is embedded at build time, so rebuild after changes. Never put credentials or JIDs in these variables.
+
+`NEXT_PUBLIC_SITE_URL` optionally supplies the real HTTPS origin for canonical/social/sitemap URLs. The pilot remains `noindex` with robots disallowing crawling. No production launch is implied.
+
+```bash
+npm run build:web
+npm run start:web
+npm run test:web
+npx playwright install chromium
+npm run test:e2e # Tests the previously built frontend
+```
+
+The editorial page follows [DESIGN.md](DESIGN.md): oversized type, the original Bee-bot, licensed food photography, and a six-chapter WhatsApp story. GSAP pins one preview on capable desktops; mobile, reduced-motion, and no-JavaScript views retain the full vertical story. [Photo sources and licenses](apps/web/ASSETS.md) are also credited in the footer. Semantic tokens live in `apps/web/src/app/globals.css`; the original mascot is in `apps/web/public/brand/bee-bot.png`. Fonts are locally served. Editorial photographs are not merchant menu photos. Verified merchant imagery remains unavailable, and preview catalog/pickup data is illustrative. Marketing components and UI primitives are separate; future authenticated operational layouts can use the same tokens while Fastify remains the business API. No dashboard exists yet.
+
+Deploy the web workspace independently with `npm run build:web` and `npm run start:web` (or the equivalent Next.js platform adapter). Configure public values in the build environment; do not copy the backend `.env` or auth directory. Public launch requires verified service readiness, content, contact approval policy, and a deliberate indexing review.
+
 ## WhatsApp development
 
 WhatsApp is disabled by default. To enable the full conversation flow with Baileys, configure `.env`:
@@ -117,8 +144,8 @@ npm run typecheck
 npm run lint
 npm run format:check
 npm test
-npm run build
-npm start
+npm run build # Backend and frontend
+npm start     # Backend only
 ```
 
 Unit tests require no external services. For integration tests, create the separate database once, then migrate it and run the suite:
@@ -135,6 +162,7 @@ The test database defaults to `DATABASE_URL` plus `_test`; override with `WHATSA
 
 ```text
 apps/api/             HTTP, messaging, conversations, catalog, cart, checkout
+apps/web/             Independent Next.js marketing frontend
 packages/database/    Prisma schema, migrations, seeds, and connections
 packages/shared/      Reusable types and pure utilities
 ```
