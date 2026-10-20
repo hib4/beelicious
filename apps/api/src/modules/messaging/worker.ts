@@ -1,3 +1,5 @@
+import type { ConversationInput } from '../conversation/commands.js';
+import type { ConversationHandler } from '../conversation/engine.js';
 import { randomUUID } from 'node:crypto';
 import type { EventScope, WhatsAppEventStore } from '@beelicious/database';
 import { GREETING, MessagingError, type MessagingAdapter } from './types.js';
@@ -11,10 +13,12 @@ export interface WorkMessage {
   chatId: string;
   senderPhone?: string | undefined;
   greeting: boolean;
+  conversation?: ConversationInput | undefined;
   timestamp: number;
 }
 export interface WorkerPolicy {
   enabled: boolean;
+  conversation?: ConversationHandler | undefined;
   scope(): EventScope | undefined;
   decode(data: unknown): WorkMessage | undefined;
 }
@@ -51,7 +55,8 @@ export function createInboxWorker(
     if (
       event.kind !== 'message' ||
       !policy.enabled ||
-      !message.greeting ||
+      (!message.conversation && !message.greeting) ||
+      message.conversation?.command.kind === 'empty' ||
       age >= 86400000 ||
       age < -300000 ||
       !(await adapter.approved(message.chatId, message.senderPhone))
@@ -63,14 +68,44 @@ export function createInboxWorker(
       await finish({ state: 'failed', lastError: 'attempts_exhausted' });
       return;
     }
+    let text = GREETING;
+    if (message.conversation) {
+      if (!policy.conversation) return;
+      if ((event.preparationAttempts ?? 0) > 5) {
+        await finish({
+          state: 'failed',
+          lastError: 'conversation_preparation_exhausted',
+        });
+        return;
+      }
+      try {
+        text = await policy.conversation.handleIncomingMessage(
+          event.id,
+          token,
+          message.conversation,
+        );
+      } catch {
+        warn('conversation_preparation_failed');
+        await finish({
+          state: (event.preparationAttempts ?? 0) >= 5 ? 'failed' : 'pending',
+          availableAt: new Date(now().getTime() + 5000),
+          lastError: 'conversation_preparation_failed',
+        });
+        return;
+      }
+    }
     // A disconnect during eligibility checks is still pre-send and recoverable.
     if (stopping || !adapter.connected()) return;
+    if (!(await adapter.approved(message.chatId, message.senderPhone))) {
+      await finish({ state: 'ignored' });
+      return;
+    }
     if (!(await store.beginSend(event.id, token, now()))) return;
     try {
       const result = await adapter.sendText(
         {
           chatId: message.chatId,
-          text: GREETING,
+          text,
           ...(message.senderPhone
             ? { recipientPhone: message.senderPhone }
             : {}),

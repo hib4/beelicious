@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { PrismaClient } from '@beelicious/database';
+import type { DomainClient } from '@beelicious/database';
 import {
   defined,
   descriptionSchema,
@@ -41,7 +41,7 @@ const menuUpdate = nonempty(menuInput);
 const order = [{ sortOrder: 'asc' }, { id: 'asc' }] as const;
 
 export class TenantService {
-  constructor(private readonly db: PrismaClient) {}
+  constructor(private readonly db: DomainClient) {}
   create(input: unknown) {
     return domainOperation(() =>
       this.db.tenant.create({ data: defined(tenantInput.parse(input)) }),
@@ -81,7 +81,7 @@ export class TenantService {
 }
 
 export class MenuCategoryService {
-  constructor(private readonly db: PrismaClient) {}
+  constructor(private readonly db: DomainClient) {}
   create(tenantId: string, input: unknown) {
     return domainOperation(async () => {
       const tenant = idSchema.parse(tenantId);
@@ -133,7 +133,7 @@ export class MenuCategoryService {
 }
 
 export class MenuService {
-  constructor(private readonly db: PrismaClient) {}
+  constructor(private readonly db: DomainClient) {}
   create(tenantId: string, input: unknown) {
     return domainOperation(async () => {
       const id = idSchema.parse(tenantId);
@@ -231,7 +231,7 @@ export class MenuService {
     return this.update(tenantId, menuItemId, { isAvailable });
   }
 }
-export function createCatalogServices(db: PrismaClient) {
+export function createCatalogServices(db: DomainClient) {
   return {
     tenants: new TenantService(db),
     categories: new MenuCategoryService(db),

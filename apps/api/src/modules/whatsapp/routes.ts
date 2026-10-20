@@ -8,6 +8,7 @@ export async function registerWhatsAppRoutes(
   app: FastifyInstance,
   config: WhatsAppConfig,
   store: WhatsAppEventStore,
+  conversationEnabled = false,
 ) {
   // Encapsulated in this plugin: all other routes retain their normal JSON parser.
   app.removeContentTypeParser('application/json');
@@ -45,7 +46,11 @@ export async function registerWhatsAppRoutes(
     }
     let events;
     try {
-      events = parsePayload(JSON.parse(request.body.toString('utf8')), config);
+      events = parsePayload(
+        JSON.parse(request.body.toString('utf8')),
+        config,
+        conversationEnabled,
+      );
     } catch {
       return reply.code(400).send({ error: 'Invalid webhook payload' });
     }

@@ -369,3 +369,99 @@ npm run test:integration
 Catalog integration tests reuse the separate migrated database ending in `_test`, selected by the existing WHATSAPP_TEST_DATABASE_URL override or derived from DATABASE_URL. They fail when the service/migrations are missing. Tests delete only their own fixture rows, never development data; reserved seed fixtures must not already exist in that test database. Tests cover database-level constraints, tenant isolation, concurrent registration/association, identity namespace separation, repeated/concurrent seeds, public visibility, and error responses. Existing messaging suites continue to mock WhatsApp transports.
 
 Phase 4 can inject the same TenantService and MenuService instances into provider-independent conversation logic: use `tenants.listActive()`, `categories.list(tenantId, true)`, `menu.available(tenantId, categoryId?)`, and `menu.get(tenantId, itemId, true)`. Recheck availability at future checkout; catalog reads are not inventory reservations or price guarantees. Future customer registration should use the normalized envelope and a verified identity-linking policy. No conversation states, cart, checkout, scheduling, payment, authentication, dashboard, or Phase 4 work is included here.
+
+## Phase 4: persistent catalog conversations
+
+The conversation engine lives in `apps/api/src/modules/conversation`. It consumes validated, provider-neutral command envelopes through the existing durable worker; it never imports Baileys payloads. Tenant/category/menu options come from the Phase 3 services and PostgreSQL. There are no carts, quantities, orders, payment actions, or new public endpoints.
+
+### Enable locally
+
+Keep the ignored root `.env` on Baileys and retain its existing approved contacts/auth directory:
+
+```dotenv
+NODE_ENV=development
+WHATSAPP_ENABLED=true
+MESSAGING_PROVIDER=baileys
+WHATSAPP_TEST_BOT_ENABLED=true
+CONVERSATION_ENABLED=true
+```
+
+`CONVERSATION_ENABLED` defaults to `false`. When false, newly received messages retain the existing fixed Phase 2 greeting behavior. When true, new eligible messages use catalog conversations instead of that greeting. Development mode, the master switch, test-bot enablement, and the active provider's allowlist are still required. Cloud API and mock support the same flow with their existing configuration. Inactive provider credentials are not required.
+
+Apply `npm run db:migrate` before restarting with `npm run dev`. The additive `20261020010000_conversations` migration preserves catalog and inbox data. Seeding is still explicit: `npm run db:seed` creates only the documented prototype examples and preserves existing edits. No live messaging is performed by migration or seeding.
+
+### Commands and states
+
+| Input                    | Behavior                                              |
+| ------------------------ | ----------------------------------------------------- |
+| Halo / Hi / Mulai / Menu | Start or restart with active tenants                  |
+| 1–5                      | Select a displayed option on the current page         |
+| 8 / 9                    | Previous / next page when displayed                   |
+| 0 / Kembali              | Previous logical screen; tenant list returns to idle  |
+| Batal                    | Clear selections and return to idle                   |
+| Bantuan                  | Command guidance without extending session inactivity |
+
+Commands ignore case and surrounding whitespace. Empty messages and unsupported transport types receive no response. Other invalid input explains the options and preserves valid selections. Numbering is local to a five-option page; UUIDs never appear in customer responses. Prices use integer database values formatted as Indonesian Rupiah.
+
+```text
+Halo → SELECT_TENANT
+1 → SELECT_CATEGORY
+1 → SELECT_MENU
+1 → VIEW_MENU_ITEM
+0 → SELECT_MENU
+Kembali → SELECT_CATEGORY
+Menu → SELECT_TENANT
+Batal → IDLE
+```
+
+Numbers in this example assume the desired option is first; actual options are dynamic. Detail screens show the current name, price, optional description, and tenant, followed by an explanation that ordering is not available yet. Images are not sent.
+
+Every selection revalidates its catalog context. Stored option IDs and a revision fingerprint prevent reordered, renamed, repriced, removed, or newly unavailable options from silently changing a number's meaning. A changed list is refreshed and the customer must choose again. Missing/inactive tenants or categories and unavailable items recover to the nearest valid parent. Catalog availability is a processing-time snapshot, not a reservation.
+
+### Persistence and delivery guarantees
+
+`ConversationSession` has a UUID, a unique messaging identity reference, typed state, nullable tenant/category/item references, versioned JSON page/option data, a revision counter, a refresh flag, lastInteractionAt, and creation/update timestamps. Customer/provider/business-account scope comes from the existing identity's `(provider, accountId, providerUserId)` namespace. JIDs/LIDs and different providers are not automatically merged. Only eligible approved contacts reach customer registration; no identity-linking workflow is added.
+
+`ConversationTurn` uniquely references one inbound `WhatsAppEvent` and stores its session revision and prepared response (maximum 4,096 characters). Session transitions and response preparation commit in one transaction before transport invocation. Session context CHECKs and composite restrictive foreign keys enforce valid state shapes and tenant/category/item ownership. There are no cascade deletions, session administration endpoints, or automatic retention/deletion jobs.
+
+The existing inbox adds a processing mode, an identity stream hash, a receipt sequence, and bounded preparation-attempt accounting. Receipt insertion uses transaction-scoped advisory locks in deterministic stream order. Claims enforce database receipt order within each identity, including delayed retries; different identities can proceed independently. This does not reconstruct WhatsApp source order when events arrive out of order.
+
+Only classified commands/numeric values are persisted, never arbitrary incoming text. Existing minimal routing identifiers remain private. Prepared responses contain public catalog text and command guidance; treat the associated routing/session records as private. Structured logs contain sanitized event names, never messages, identifiers, or raw database errors.
+
+The worker validates approval before registration and again before sending. Duplicate events reuse the same inbox key and turn; they cannot advance a session twice. Expired processing leases recover without repeating committed transitions. After a crash between preparation and sending, the exact saved response is reused. Interrupted/ambiguous sends become `uncertain` and are never automatically resent. Only an explicit Cloud rate-limit rejection permits the existing bounded transport retry, using the saved response. A failed/uncertain prepared response marks the session for screen refresh; the next non-global input shows that screen rather than applying a selection. Help preserves this requirement.
+
+Database preparation failures send nothing uncommitted, log a sanitized event, and receive five bounded preparation claims with five-second delays after recorded failures. If storage itself is down, expired leases recover when PostgreSQL returns. After exhausted work or an outage, send a new command deliberately. Exactly-once external delivery is not guaranteed.
+
+Sessions expire after **30 minutes** without interaction; help does not extend this deadline. A later selection restarts tenant browsing with an expiry notice. Saved sessions survive application restarts while valid; Baileys still ignores historical messages received before process startup under its existing freshness rules. An invalid stored JSON context resets safely. Expiry resets context when the next message is processed; it does not delete records.
+
+Legacy greeting-only inbox rows remain readable and retain their original greeting handler. They are not reinterpreted as conversation commands. Disabling conversations leaves conversation-mode work pending; provider switches continue to isolate work by account/provider. Stop and restart after changing configuration.
+
+### Verification and live checklist
+
+```bash
+npm ci
+npm run typecheck
+npm run lint
+npm run format:check
+npm test
+npm run build
+npm run db:migrate
+npm run db:migrate:test
+npm run test:integration
+```
+
+Unit tests require no database. Integration tests reuse the guarded separate `_test` database, mock every WhatsApp transport, and remove only suite-owned rows in dependency order. They cover session/turn integrity, restart recovery, concurrent duplicates/workers, ordered commands, uncertain-send suppression/refresh, explicit Cloud retry, privacy, catalog changes, provider namespaces, and mock application lifecycle.
+
+For a deliberate live Baileys test:
+
+1. Start one server with the configuration above and wait for `baileys_connected`. Use the existing QR/session-storage runbook if needed.
+2. From an approved separate customer account, send `Halo`; select tenant, category, and item using the displayed numbers. Verify prices against the catalog API.
+3. Exercise `0`, `Kembali`, `Bantuan`, `Menu`, invalid input, and `Batal`. Confirm each unique incoming message produces one appropriate response and outgoing echoes produce none.
+4. Restart using Ctrl+C and the same auth directory while browsing. Send a new command within 30 minutes and verify the saved screen resumes without rescanning a valid session.
+5. Verify unapproved contacts/groups receive no replies. After 30 minutes of inactivity, verify a selection refreshes the tenant screen.
+
+**Live status:** the user previously confirmed Baileys pairing/greeting before Phase 3. Phase 4 real-device browsing, delivery, and restart restoration remain **unverified** until this checklist is performed. Mocked tests establish application behavior, not WhatsApp connectivity. Baileys remains unofficial, development-only, and subject to account restrictions.
+
+Known limits: catalog service lists are still read in full before five-option rendering; pagination bounds messages rather than database result size. Sessions/turns have no retention policy yet. Delivery may be uncertain and requires deliberate recovery. The engine uses fixed deterministic Indonesian copy and numeric text menus.
+
+Phase 5 can extend the typed state/transition result after `VIEW_MENU_ITEM` and reuse the same atomic session/response preparation for quantity and cart operations. This phase creates no cart/order models and does not begin Phase 5.

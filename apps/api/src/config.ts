@@ -22,6 +22,7 @@ const flagsSchema = z.object({
     .enum(['cloud-api', 'baileys', 'mock'])
     .default('cloud-api'),
   WHATSAPP_ENABLED: flag,
+  CONVERSATION_ENABLED: flag,
   WHATSAPP_TEST_BOT_ENABLED: flag,
 });
 const whatsappSchema = z.object({
@@ -69,6 +70,7 @@ const contactsSchema = z
   )
   .pipe(z.array(z.string().regex(/^[1-9]\d{6,14}$/)));
 export type Config = z.infer<typeof environmentSchema> & {
+  conversationEnabled?: boolean;
   whatsapp?: WhatsAppConfig;
   messaging?: MessagingConfig;
 };
@@ -102,6 +104,18 @@ export function parseEnvironment(
   const flags = flagsSchema.safeParse(environment);
   if (!flags.success)
     invalid(flags.error.issues.map((issue) => issue.path.join('.')));
+  if (
+    flags.data.CONVERSATION_ENABLED &&
+    (!flags.data.WHATSAPP_ENABLED ||
+      !flags.data.WHATSAPP_TEST_BOT_ENABLED ||
+      result.data.NODE_ENV !== 'development')
+  )
+    invalid([
+      'CONVERSATION_ENABLED',
+      'WHATSAPP_ENABLED',
+      'WHATSAPP_TEST_BOT_ENABLED',
+      'NODE_ENV',
+    ]);
   if (!flags.data.WHATSAPP_ENABLED) {
     if (flags.data.WHATSAPP_TEST_BOT_ENABLED)
       invalid(['WHATSAPP_TEST_BOT_ENABLED']);
@@ -127,6 +141,7 @@ export function parseEnvironment(
       invalid(['BAILEYS_AUTH_DIR']);
     return {
       ...result.data,
+      conversationEnabled: flags.data.CONVERSATION_ENABLED,
       messaging: {
         provider,
         testBotEnabled: flags.data.WHATSAPP_TEST_BOT_ENABLED,
@@ -152,6 +167,7 @@ export function parseEnvironment(
   }
   return {
     ...result.data,
+    conversationEnabled: flags.data.CONVERSATION_ENABLED,
     messaging: {
       provider,
       testBotEnabled: flags.data.WHATSAPP_TEST_BOT_ENABLED,

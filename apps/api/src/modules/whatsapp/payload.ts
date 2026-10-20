@@ -1,3 +1,7 @@
+import {
+  conversationMetadata,
+  conversationInputSchema,
+} from '../conversation/commands.js';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { isGreeting, type IncomingMessage } from '../messaging/types.js';
@@ -46,6 +50,7 @@ export const storedMessageSchema = z.object({
   wabaId: id,
   phoneNumberId: id,
   sender: z.string().regex(/^[1-9]\d{6,14}$/),
+  conversation: conversationInputSchema.optional(),
   greeting: z.boolean(),
   timestamp: z.number().finite(),
 });
@@ -56,6 +61,7 @@ function key(parts: unknown[]): string {
 export function parsePayload(
   payload: unknown,
   config: WhatsAppConfig,
+  conversationEnabled = false,
 ): ReceivedEvent[] {
   const object = z.object({ object: z.string() }).parse(payload);
   if (object.object !== 'whatsapp_business_account') return [];
@@ -88,10 +94,21 @@ export function parsePayload(
         // Classify only the greeting; never retain arbitrary text or contact profiles.
         const greeting =
           !isSelf && message.type === 'text' && isGreeting(normalized.text);
+        const conversation =
+          conversationEnabled && !isSelf && message.type === 'text'
+            ? conversationMetadata(normalized)
+            : undefined;
         events.push({
+          ...(conversation
+            ? {
+                processingMode: conversation.processingMode,
+                streamKey: conversation.streamKey,
+              }
+            : {}),
           dedupKey: key(['message', ...scope, message.id]),
           kind: 'message',
           data: {
+            ...(conversation ? { conversation: conversation.input } : {}),
             provider: 'cloud-api',
             accountId: cloudAccountId(config),
             wabaId: entry.id,

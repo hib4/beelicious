@@ -1,3 +1,4 @@
+import type { ConversationHandler } from '../conversation/engine.js';
 import type { WhatsAppEventStore } from '@beelicious/database';
 import type { MessagingConfig } from '../../config.js';
 import {
@@ -19,6 +20,7 @@ export function createMessagingRuntime(
   development: boolean,
   warn: (event: string) => void,
   dependencies: {
+    conversation?: ConversationHandler;
     adapterFactory?: (callbacks: AdapterCallbacks) => Promise<MessagingAdapter>;
     now?: () => Date;
     qr?: (value: string) => void;
@@ -29,7 +31,8 @@ export function createMessagingRuntime(
   let startup: Promise<void> | undefined;
   let stopping = false;
   const callbacks: AdapterCallbacks = {
-    receive: async (messages) => store.receive(incomingEvents(messages)),
+    receive: async (messages) =>
+      store.receive(incomingEvents(messages, !!dependencies.conversation)),
     delivery: async (updates) => store.receive(deliveryEvents(updates)),
     warn,
   };
@@ -58,10 +61,15 @@ export function createMessagingRuntime(
       active,
       {
         enabled: development && config.testBotEnabled,
+        conversation: dependencies.conversation,
         scope: () => {
           const accountId = active.accountId();
           return accountId
-            ? { provider: active.provider, accountId }
+            ? {
+                provider: active.provider,
+                accountId,
+                conversationEnabled: !!dependencies.conversation,
+              }
             : undefined;
         },
         decode(data) {
@@ -69,7 +77,11 @@ export function createMessagingRuntime(
           if (
             !parsed.success ||
             parsed.data.provider !== active.provider ||
-            parsed.data.accountId !== active.accountId()
+            parsed.data.accountId !== active.accountId() ||
+            (parsed.data.conversation &&
+              (parsed.data.conversation.provider !== parsed.data.provider ||
+                parsed.data.conversation.accountId !== parsed.data.accountId ||
+                parsed.data.conversation.senderId !== parsed.data.senderId))
           )
             return undefined;
           return parsed.data;

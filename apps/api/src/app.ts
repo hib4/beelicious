@@ -1,3 +1,4 @@
+import { ConversationEngine } from './modules/conversation/engine.js';
 import { createCatalogServices } from './modules/catalog/services.js';
 import {
   registerCatalogRoutes,
@@ -75,6 +76,12 @@ export function buildApp(
     dependencies.catalogServices ??
     (prisma ? createCatalogServices(prisma) : undefined);
   app.register(async (scope) => registerCatalogRoutes(scope, catalog));
+  if (config.conversationEnabled && !prisma)
+    throw new Error('Conversation persistence is required');
+  const conversation =
+    config.conversationEnabled && prisma
+      ? new ConversationEngine(prisma, dependencies.now)
+      : undefined;
   let worker: ReturnType<typeof createWorker> | undefined;
   let messaging: MessagingRuntime | undefined;
   if (config.whatsapp) {
@@ -84,7 +91,7 @@ export function buildApp(
     if (!store) throw new Error('WhatsApp event storage is required');
     const whatsapp = config.whatsapp;
     app.register(async (scope) => {
-      await registerWhatsAppRoutes(scope, whatsapp, store);
+      await registerWhatsAppRoutes(scope, whatsapp, store, !!conversation);
     });
     worker = createWorker(
       store,
@@ -95,6 +102,7 @@ export function buildApp(
         app.log.warn({ event }, 'WhatsApp processing requires attention');
       },
       dependencies.now,
+      conversation,
     );
     app.addHook('onListen', async () => {
       worker?.start();
@@ -113,6 +121,7 @@ export function buildApp(
         app.log.info({ event }, 'Messaging provider event');
       },
       {
+        ...(conversation ? { conversation } : {}),
         ...(dependencies.messagingAdapterFactory
           ? { adapterFactory: dependencies.messagingAdapterFactory }
           : {}),

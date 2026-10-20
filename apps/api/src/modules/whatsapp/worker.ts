@@ -1,3 +1,4 @@
+import type { ConversationHandler } from '../conversation/engine.js';
 import type { WhatsAppEventStore } from '@beelicious/database';
 import type { WhatsAppConfig } from '../../config.js';
 import type { TextSender } from './client.js';
@@ -18,6 +19,7 @@ export function createWorker(
   isDevelopment: boolean,
   warn: (event: string) => void,
   now: () => Date = () => new Date(),
+  conversation?: ConversationHandler,
 ): Worker {
   const adapter = createCloudAdapter(config, sender);
   return createInboxWorker(
@@ -25,10 +27,12 @@ export function createWorker(
     adapter,
     {
       enabled: isDevelopment && config.testBotEnabled,
+      conversation,
       scope: () => ({
         provider: 'cloud-api',
         accountId: cloudAccountId(config),
         legacyCloud: config,
+        conversationEnabled: !!conversation,
       }),
       decode(data) {
         const parsed = storedMessageSchema.safeParse(data);
@@ -36,6 +40,14 @@ export function createWorker(
         const m = parsed.data;
         return {
           chatId: m.sender,
+          conversation:
+            m.wabaId === config.wabaId &&
+            m.phoneNumberId === config.phoneNumberId &&
+            m.conversation?.provider === 'cloud-api' &&
+            m.conversation.accountId === cloudAccountId(config) &&
+            m.conversation.senderId === m.sender
+              ? m.conversation
+              : undefined,
           timestamp: m.timestamp,
           greeting:
             m.greeting &&

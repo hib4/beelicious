@@ -60,3 +60,17 @@ export function createDatabase(connectionString: string): ApplicationDatabase {
     },
   };
 }
+
+export type DomainClient = Pick<
+  PrismaClient,
+  | 'tenant'
+  | 'menuCategory'
+  | 'menuItem'
+  | 'customer'
+  | 'customerMessagingIdentity'
+>;
+export type {
+  ConversationSession,
+  ConversationTurn,
+  ConversationState,
+} from './generated/prisma/client.js';

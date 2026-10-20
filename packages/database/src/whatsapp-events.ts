@@ -9,6 +9,8 @@ export type EventState =
   | 'failed'
   | 'uncertain';
 export interface ReceivedEvent {
+  processingMode?: string;
+  streamKey?: string;
   dedupKey: string;
   kind: 'message' | 'status';
   data: Prisma.InputJsonObject;
@@ -18,6 +20,8 @@ export interface ClaimedEvent {
   kind: string;
   data: unknown;
   attempts: number;
+  preparationAttempts?: number;
+  processingMode?: string;
 }
 export interface EventResult {
   state: 'pending' | 'completed' | 'ignored' | 'failed' | 'uncertain';
@@ -28,6 +32,7 @@ export interface EventResult {
 export interface EventScope {
   provider: 'cloud-api' | 'baileys' | 'mock';
   accountId: string;
+  conversationEnabled?: boolean;
   legacyCloud?: { wabaId: string; phoneNumberId: string };
 }
 export interface WhatsAppEventStore {
@@ -45,6 +50,12 @@ export function createEventStore(client: PrismaClient): WhatsAppEventStore {
     async receive(events) {
       if (events.length === 0) return;
       await client.$transaction(async (tx) => {
+        // Serialize receipt assignment per identity, including concurrent batches.
+        const streams = [
+          ...new Set(events.flatMap((e) => (e.streamKey ? [e.streamKey] : []))),
+        ].sort();
+        for (const stream of streams)
+          await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${stream}, 4))`;
         await tx.whatsAppEvent.createMany({
           data: events,
           skipDuplicates: true,
@@ -54,7 +65,7 @@ export function createEventStore(client: PrismaClient): WhatsAppEventStore {
     async claim(now, token, scope) {
       // Parameterized JSON metadata filters keep inactive accounts/providers pending.
       const legacy = scope.legacyCloud;
-      const filter = Prisma.sql`(
+      const filter = Prisma.sql`("processingMode" = 'greeting' OR ${scope.conversationEnabled ?? false}) AND (
         ("data"->>'provider' = ${scope.provider} AND "data"->>'accountId' = ${scope.accountId})
         OR (${scope.provider === 'cloud-api' && !!legacy} AND "data"->>'provider' IS NULL AND (
           "kind" = 'status' OR ("data"->>'wabaId' = ${legacy?.wabaId ?? ''} AND "data"->>'phoneNumberId' = ${legacy?.phoneNumberId ?? ''})
@@ -62,23 +73,42 @@ export function createEventStore(client: PrismaClient): WhatsAppEventStore {
       )`;
       const leaseUntil = new Date(now.getTime() + 30000);
       // Sending is never reclaimed for a second send: its result may be unknown.
-      await client.$executeRaw`
+      await client.$transaction(async (tx) => {
+        const interrupted = await tx.$queryRaw<{ id: string }[]>`
         UPDATE "WhatsAppEvent"
         SET "state" = 'uncertain', "leaseToken" = NULL, "leaseUntil" = NULL,
             "lastError" = 'interrupted_send', "updatedAt" = ${now}
         WHERE ${filter} AND "state" = 'sending' AND "leaseUntil" <= ${now}
+        RETURNING "id"
       `;
+        if (interrupted.length)
+          await tx.conversationSession.updateMany({
+            where: {
+              turns: {
+                some: { eventId: { in: interrupted.map((e) => e.id) } },
+              },
+            },
+            data: { requiresRefresh: true },
+          });
+      });
       const rows = await client.$queryRaw<ClaimedEvent[]>`
         UPDATE "WhatsAppEvent" AS event
-        SET "state" = 'processing', "leaseToken" = ${token}, "leaseUntil" = ${leaseUntil}, "updatedAt" = ${now}
+        SET "state" = 'processing', "leaseToken" = ${token}, "leaseUntil" = ${leaseUntil}, "updatedAt" = ${now},
+            "preparationAttempts" = "preparationAttempts" + CASE WHEN "processingMode" = 'conversation' THEN 1 ELSE 0 END
         WHERE event."id" = (
-          SELECT "id" FROM "WhatsAppEvent"
+          SELECT "id" FROM "WhatsAppEvent" AS candidate
           WHERE ${filter} AND (("state" = 'pending' AND "availableAt" <= ${now})
              OR ("state" = 'processing' AND "leaseUntil" <= ${now}))
-          ORDER BY "availableAt", "createdAt", "id"
+          AND ("streamKey" IS NULL OR NOT EXISTS (
+            SELECT 1 FROM "WhatsAppEvent" AS earlier
+            WHERE earlier."streamKey" = candidate."streamKey"
+              AND earlier."receiptSequence" < candidate."receiptSequence"
+              AND earlier."state" IN ('pending', 'processing', 'sending')
+          ))
+          ORDER BY "receiptSequence"
           FOR UPDATE SKIP LOCKED LIMIT 1
         )
-        RETURNING event."id", event."kind", event."data", event."attempts"
+        RETURNING event."id", event."kind", event."data", event."attempts", event."processingMode", event."preparationAttempts"
       `;
       return rows[0];
     },
@@ -99,13 +129,23 @@ export function createEventStore(client: PrismaClient): WhatsAppEventStore {
       return result.count === 1;
     },
     async finish(id, token, result) {
-      await client.whatsAppEvent.updateMany({
-        where: {
-          id,
-          leaseToken: token,
-          state: { in: ['processing', 'sending'] },
-        },
-        data: { ...result, leaseToken: null, leaseUntil: null },
+      await client.$transaction(async (tx) => {
+        const updated = await tx.whatsAppEvent.updateMany({
+          where: {
+            id,
+            leaseToken: token,
+            state: { in: ['processing', 'sending'] },
+          },
+          data: { ...result, leaseToken: null, leaseUntil: null },
+        });
+        if (
+          updated.count &&
+          ['failed', 'uncertain', 'ignored'].includes(result.state)
+        )
+          await tx.conversationSession.updateMany({
+            where: { turns: { some: { eventId: id } } },
+            data: { requiresRefresh: true },
+          });
       });
     },
   };
