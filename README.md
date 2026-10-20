@@ -372,6 +372,8 @@ Phase 4 can inject the same TenantService and MenuService instances into provide
 
 ## Phase 4: persistent catalog conversations
 
+This section describes the browsing foundation. The Phase 5 section below documents the current cart-enabled extension.
+
 The conversation engine lives in `apps/api/src/modules/conversation`. It consumes validated, provider-neutral command envelopes through the existing durable worker; it never imports Baileys payloads. Tenant/category/menu options come from the Phase 3 services and PostgreSQL. There are no carts, quantities, orders, payment actions, or new public endpoints.
 
 ### Enable locally
@@ -465,3 +467,130 @@ For a deliberate live Baileys test:
 Known limits: catalog service lists are still read in full before five-option rendering; pagination bounds messages rather than database result size. Sessions/turns have no retention policy yet. Delivery may be uncertain and requires deliberate recovery. The engine uses fixed deterministic Indonesian copy and numeric text menus.
 
 Phase 5 can extend the typed state/transition result after `VIEW_MENU_ITEM` and reuse the same atomic session/response preparation for quantity and cart operations. This phase creates no cart/order models and does not begin Phase 5.
+
+## Phase 5: persistent shopping carts
+
+Phase 5 extends the Phase 4 engine with quantity selection and cart management. Baileys remains the active development provider; Cloud API and mock use the same provider-independent flow. Existing catalog endpoints remain read-only. There are no new public cart/customer/write endpoints, orders, checkout, pickup scheduling, or payments.
+
+### Setup and lifecycle
+
+Apply the additive migrations and restart the development server:
+
+```bash
+npm run db:migrate
+npm run db:migrate:test
+npm run dev
+```
+
+Keep the existing approved-contact settings, `MESSAGING_PROVIDER=baileys`, and `CONVERSATION_ENABLED=true` in your ignored local configuration. No inactive-provider credentials are needed. `CART_MAX_ITEM_QUANTITY` defaults to `20`; valid configuration is 1–1,000. This limits the **combined quantity of each menu item**, including repeated additions. Changing it does not rewrite existing carts; quantities above a lowered limit must be corrected before READY. No seed or live send runs automatically.
+
+Cart statuses:
+
+- **ACTIVE**: editable selections.
+- **READY**: selections saved for a future checkout phase; **no order has been placed**, stock reserved, or payment requested.
+- **ABANDONED**: historical cart left behind after confirmed tenant switching. It is excluded from the current cart lookup.
+
+One ACTIVE or READY cart exists per conversation session, scoped through its provider/account/customer messaging identity. Even independently verified identities belonging to the same customer have separate carts. PN JIDs, LIDs, providers, and business accounts are never automatically merged.
+
+`Menu`, greetings, `Batal`, inactivity expiry, and application restarts preserve carts. `Batal` ends only the conversation context. `Keranjang` retrieves the current cart from any screen. A READY cart requires explicit **Edit Keranjang** confirmation before edits. Selecting another tenant with a nonempty ACTIVE or READY cart asks whether to leave the old cart; confirmation marks it ABANDONED. Refusal keeps its contents. Empty carts can switch without confirmation. Clearing an ACTIVE cart uses a separate confirmation and retains an empty usable cart.
+
+### Models and service boundaries
+
+`Cart` stores UUIDs for the customer, messaging identity, session, and tenant; a typed status; a revision; and timestamps. `CartItem` stores its cart/tenant/menu references, positive integer quantity, saved integer Rupiah unit price, and timestamps. A unique cart/menu pair merges repeat additions into one line. A partial unique PostgreSQL index permits only one ACTIVE or READY cart per session.
+
+Composite foreign keys enforce session/identity/customer ownership and cart/menu tenant consistency. Quantities must be positive and stored prices nonnegative. All foreign keys remain restrictive; no cascade deletion or destructive customer/catalog operations are introduced. The existing tenant/category consistency and price CHECK constraints remain intact. The `cart_states` migration commits enum additions before the separate `carts` migration uses them in the extended session CHECK.
+
+`apps/api/src/modules/cart` provides CartService and a pure pricing calculation. Service methods cover get/create, retrieval/summary, addition, quantity updates, removal, clearing, readiness, and reopening. Calls require internal customer/session IDs and validate ownership against the database. These IDs are an internal service contract, not a substitute for future API authentication.
+
+The engine supplies its existing Prisma transaction to CartService. Standalone service mutations open bounded-retry transactions. Session/cart row locks serialize changes, and catalog share locks protect validation until commit. Prisma 7 raw-query and ORM serialization conflicts are recognized without logging exception details. Transactions lock session before cart, then catalog rows in deterministic order.
+
+### Conversation screens and navigation
+
+Phase 4 browsing remains available. Item details now offer **1. Tambah ke Keranjang**, opening SELECT_QUANTITY. Positive integers select a quantity; `0` remains Back and never sets quantity to zero. Invalid input preserves the prompt. Availability and pricing are checked again when the quantity is submitted.
+
+| State                    | Behavior                                                           |
+| ------------------------ | ------------------------------------------------------------------ |
+| SELECT_QUANTITY          | Enter a quantity for the selected menu item                        |
+| CART_ACTION              | Add another menu, view the cart, or finish selecting               |
+| CART_REVIEW              | Show persisted lines/subtotal; add, edit, remove, finish, or clear |
+| CART_EDIT_QUANTITY       | Select an existing cart line                                       |
+| CART_EDIT_QUANTITY_INPUT | Replace its quantity with a positive integer                       |
+| CART_REMOVE_ITEM         | Select one line to remove                                          |
+| CART_READY               | Saved selections and an explicit reopening option                  |
+| CART_CONFIRM_CLEAR       | Confirm emptying the current ACTIVE cart                           |
+| CART_CONFIRM_SWITCH      | Confirm abandoning the previous tenant's cart                      |
+| CART_CONFIRM_REOPEN      | Confirm changing READY back to ACTIVE                              |
+| CART_CONFIRM_PRICE       | Accept all displayed price changes and the pending action          |
+
+Review actions are `1` Add Menu, `2` Change Quantity, `3` Remove Menu, `4` Finish Selecting, and `6` Clear Cart. Edit/remove selections show five lines per page; `8`/`9` navigate when shown. Cart summaries also paginate five lines, but display the **whole-cart subtotal** on every page. Line ordering is creation time then UUID. Option IDs and cart/catalog fingerprints prevent changed lists from applying a number to the wrong line.
+
+`0`/`Kembali` returns from review/actions to categories and from editing/confirmation to review. From quantity selection it returns to item details. `Menu`, `Batal`, `Bantuan`, and `Keranjang` work globally. Help preserves the screen and does not extend inactivity. Removing the last item leaves an empty ACTIVE cart, which cannot become READY. Unavailable saved items remain visible with warnings and can be removed; additions/quantity updates are blocked until invalid contents are resolved.
+
+### Prices and reliable processing
+
+Saved unit prices are not silently overwritten. A changed prompt or saved price produces a proposal showing old/new prices and the prospective subtotal. **Terima semua perubahan harga** explicitly accepts the proposal and pending addition/update/completion together. Declining changes nothing. Confirmation revalidates the cart revision, prices, availability, and quantities; another change produces a fresh proposal instead of accepting stale prices.
+
+Line subtotal is `quantity × saved unitPrice`; cart subtotal sums the lines using safe integer arithmetic. Invalid values and overflow are rejected. Totals always come from the server, never message text. There are no fees, taxes, discounts, or floating-point money. A subtotal is not a final payable amount. READY requires a nonempty cart, active tenant/categories, available menu items, allowed quantities, and acknowledged current prices. This is a processing-time check, not an inventory reservation or future price guarantee.
+
+The existing engine transaction atomically commits the cart mutation, session transition, and unique ConversationTurn response intent. Reprocessing an event reuses its saved response before any cart mutation. Receipt ordering, stream scopes, leases, and ownership tokens remain unchanged. A failed or ambiguous WhatsApp send does not reapply an addition. The next input refreshes committed state before accepting another numeric action. Only the existing explicit Cloud rate-limit rejection permits automatic transport retries; no exactly-once external delivery guarantee is claimed.
+
+Only classified commands and numeric values are persisted from inbound messages. Prepared cart responses contain catalog selections and should be treated as private customer data. Logs contain no raw message text, contact IDs, or raw persistence exceptions.
+
+### Example with the development prototype catalog
+
+These examples use only the supplied Warung Babe prototype entries; they are not a verified production catalog. Option numbers depend on the currently displayed database list.
+
+```text
+Customer: Halo
+Bot: Choose a tenant → 1. Warung Babe
+Customer: 1
+Bot: Choose category → 1. Makanan / 2. Minuman
+Customer: 1
+Bot: 1. Nasi Goreng Spesial — Rp20.000
+Customer: 1
+Bot: Item details → 1. Tambah ke Keranjang
+Customer: 1
+Bot: Berapa porsi? (1–20)
+Customer: 2
+Bot: Added → 1. Tambah Menu / 2. Lihat Keranjang / 3. Selesai Memilih
+Customer: 1
+Bot: Choose category
+Customer: 2
+Bot: 1. Es Teh Manis — Rp5.000
+Customer: 1
+Bot: Item details → 1. Tambah ke Keranjang
+Customer: 1
+Bot: Berapa porsi? (1–20)
+Customer: 1
+Bot: Added → choose next action
+Customer: 2
+Bot: 2x Nasi Goreng Spesial — Rp40.000
+     1x Es Teh Manis — Rp5.000
+     Subtotal: Rp45.000
+Customer: 4
+Bot: Pilihan menu tersimpan! Subtotal: Rp45.000
+     Keranjang READY belum menjadi pesanan.
+     Pickup dan pembayaran tersedia pada tahap berikutnya.
+```
+
+### Verification and live Baileys checklist
+
+```bash
+npm ci
+npm run typecheck
+npm run lint
+npm run format:check
+npm test
+npm run build
+npm run db:migrate
+npm run db:migrate:test
+npm run test:integration
+```
+
+Integration tests require the existing guarded separate `_test` database. They cover service/database integrity, price acknowledgement, duplicate and concurrent inputs, cart/session transaction rollback, provider namespaces, prepared-response recovery, and mocked Baileys/Cloud/mock flows. Cleanup removes only suite-owned cart items/carts before their sessions, customers, and catalog fixtures. The readiness fixture explicitly disables conversation features independently of local development flags.
+
+For a deliberate real-device test, start one Baileys server with existing allowlists/auth storage, send a new `Halo` from an approved separate contact, and follow the example. Test repeated additions up to the cap, edit/remove, empty cart, READY reopening, Menu/Batal preservation, confirmed tenant switching, and restart restoration. Verify totals against database catalog prices. Use an internal MenuService call or controlled development database edit to test price/availability changes; no unauthenticated write endpoint is provided.
+
+**Live Phase 5 WhatsApp delivery and restart restoration remain unverified until demonstrated with a real device.** Mock tests do not establish live connectivity. Baileys remains unofficial, development-only, and subject to account restrictions.
+
+Known limits: catalog/cart lists are fetched before message pagination; no stock reservation, automatic cart expiration, retention cleanup, or cross-identity cart sharing exists. Historical carts and private prepared responses require a future retention policy. Phase 6 can consume READY carts through CartService, but must revalidate ownership, revision, current prices, and availability before introducing checkout. Phase 6 is not implemented.

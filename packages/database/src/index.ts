@@ -74,3 +74,7 @@ export type {
   ConversationTurn,
   ConversationState,
 } from './generated/prisma/client.js';
+
+export type { Cart, CartItem, CartStatus } from './generated/prisma/client.js';
+
+export { isTransactionConflict } from './transactions.js';

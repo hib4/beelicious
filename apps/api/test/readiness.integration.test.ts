@@ -6,6 +6,7 @@ it('queries a real PostgreSQL database and closes its pool', async () => {
   const config = parseEnvironment({
     ...process.env,
     NODE_ENV: 'test',
+    CONVERSATION_ENABLED: 'false',
     WHATSAPP_ENABLED: 'false',
     WHATSAPP_TEST_BOT_ENABLED: 'false',
   });

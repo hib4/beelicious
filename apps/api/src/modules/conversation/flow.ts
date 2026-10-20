@@ -3,6 +3,12 @@ import { z } from 'zod';
 import type { ConversationState } from '@beelicious/database';
 import type { CatalogServices } from '../catalog/services.js';
 import { DomainError } from '../catalog/validation.js';
+import { cartActionSchema } from '../cart/service.js';
+import {
+  cartTransition,
+  tenantSelection,
+  type CartDependencies,
+} from './cart-flow.js';
 import type { Command } from './commands.js';
 
 export const stateDataSchema = z.strictObject({
@@ -12,6 +18,32 @@ export const stateDataSchema = z.strictObject({
   menuPage: z.number().int().nonnegative().max(2147483647),
   options: z.array(z.uuid()).max(5),
   fingerprint: z.string(),
+  cartPage: z.number().int().nonnegative().max(2147483647).default(0),
+  editItemId: z.uuid().nullable().default(null),
+  expectedPrice: z.number().int().nonnegative().nullable().default(null),
+  pending: z
+    .discriminatedUnion('kind', [
+      z.strictObject({
+        kind: z.literal('switch'),
+        tenantId: z.uuid(),
+        fingerprint: z.string(),
+      }),
+      z.strictObject({
+        kind: z.literal('price'),
+        action: cartActionSchema,
+        fingerprint: z.string(),
+        changes: z.array(
+          z.strictObject({
+            name: z.string(),
+            oldPrice: z.number().int().nonnegative(),
+            newPrice: z.number().int().nonnegative(),
+          }),
+        ),
+        subtotal: z.number().int().nonnegative(),
+      }),
+    ])
+    .nullable()
+    .default(null),
 });
 export type StateData = z.infer<typeof stateDataSchema>;
 export const initialData = (): StateData => ({
@@ -21,6 +53,10 @@ export const initialData = (): StateData => ({
   menuPage: 0,
   options: [],
   fingerprint: '',
+  cartPage: 0,
+  editItemId: null,
+  expectedPrice: null,
+  pending: null,
 });
 export interface Context {
   state: ConversationState;
@@ -37,12 +73,12 @@ export const idle = (): Context => ({
   data: initialData(),
 });
 export const HELP =
-  'Bantuan Beelicious 🐝\n\nHalo / Hi / Mulai / Menu: mulai dari daftar tenant.\nBalas nomor pilihan yang ditampilkan.\n8 / 9: halaman sebelumnya / berikutnya (jika tersedia).\n0 / Kembali: kembali.\nBatal: akhiri sesi.\nBantuan: tampilkan panduan.\n\nPemesanan belum tersedia.';
+  'Bantuan Beelicious 🐝\n\nHalo / Hi / Mulai / Menu: mulai dari daftar tenant.\nBalas nomor pilihan yang ditampilkan.\n8 / 9: halaman sebelumnya / berikutnya (jika tersedia).\n0 / Kembali: kembali.\nBatal: akhiri sesi.\nBantuan: tampilkan panduan.\n\nKeranjang: lihat pilihan tersimpan. Batal tidak menghapus keranjang.\nPickup dan pembayaran belum tersedia.';
 export const rupiah = (value: number) =>
   `Rp${String(value).replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`;
 const label = (value: string) => value.replace(/\s+/g, ' ').trim();
 const navigation =
-  '\n\n0. Kembali\n\n*Menu* — Mulai dari awal\n*Bantuan* — Lihat panduan\n*Batal* — Akhiri sesi';
+  '\n\n0. Kembali\n\n*Menu* — Mulai dari awal\n*Keranjang* — Lihat keranjang\n*Bantuan* — Lihat panduan\n*Batal* — Akhiri sesi';
 function setState(c: Context, state: ConversationState) {
   c.state = state;
   if (state === 'IDLE' || state === 'SELECT_TENANT') {
@@ -56,18 +92,25 @@ function setState(c: Context, state: ConversationState) {
   if (state !== 'VIEW_MENU_ITEM') c.selectedMenuItemId = null;
   c.data.options = [];
   c.data.fingerprint = '';
+  c.data.pending = null;
+  c.data.editItemId = null;
+  c.data.expectedPrice = null;
 }
 function back(c: Context) {
-  const previous: Record<ConversationState, ConversationState> = {
+  const previous: Partial<Record<ConversationState, ConversationState>> = {
     IDLE: 'IDLE',
     SELECT_TENANT: 'IDLE',
     SELECT_CATEGORY: 'SELECT_TENANT',
     SELECT_MENU: 'SELECT_CATEGORY',
     VIEW_MENU_ITEM: 'SELECT_MENU',
   };
-  setState(c, previous[c.state]);
+  setState(c, previous[c.state] ?? 'IDLE');
 }
 function validShape(c: Context) {
+  if (c.state.startsWith('CART_'))
+    return (
+      !!c.selectedTenantId && !c.selectedCategoryId && !c.selectedMenuItemId
+    );
   return c.state === 'IDLE' || c.state === 'SELECT_TENANT'
     ? !c.selectedTenantId && !c.selectedCategoryId && !c.selectedMenuItemId
     : c.state === 'SELECT_CATEGORY'
@@ -92,7 +135,12 @@ export async function transition(
   command: Command,
   catalog: CatalogServices,
   flags: { expired?: boolean; refresh?: boolean } = {},
+  carts?: CartDependencies,
 ): Promise<{ context: Context; text: string }> {
+  const cartResult = carts
+    ? await cartTransition(original, command, catalog, carts, flags)
+    : null;
+  if (cartResult) return cartResult;
   let c = structuredClone(original);
   let notice = '';
   const reset = () => {
@@ -111,7 +159,7 @@ export async function transition(
   if (command.kind === 'cancel')
     return {
       context: idle(),
-      text: 'Sesi dibatalkan. Kirim Halo, Hi, Mulai, atau Menu untuk mulai kembali.',
+      text: 'Keranjang tetap tersimpan. Sesi dibatalkan. Kirim Halo, Hi, Mulai, atau Menu untuk mulai kembali.',
     };
   if (command.kind === 'start') {
     reset();
@@ -153,6 +201,10 @@ export async function transition(
       command.value <= 5 ? before.options[command.value - 1] : undefined;
     if (id) {
       if (c.state === 'SELECT_TENANT') {
+        if (carts) {
+          const intercepted = await tenantSelection(c, id, catalog, carts);
+          if (intercepted) return intercepted;
+        }
         setState(c, 'SELECT_CATEGORY');
         c.selectedTenantId = id;
       } else if (c.state === 'SELECT_CATEGORY') {
@@ -258,7 +310,7 @@ export async function transition(
       return screen();
     }
     return {
-      text: `🍳 ${label(item.name)}\n\nHarga: ${rupiah(item.price)}\nTenant: ${label(tenant.name)}${item.description ? `\n\n${item.description}` : ''}\n\nFitur pemesanan akan tersedia pada tahap berikutnya.${navigation}`,
+      text: `🍳 ${label(item.name)}\n\nHarga: ${rupiah(item.price)}\nTenant: ${label(tenant.name)}${item.description ? `\n\n${item.description}` : ''}\n\n${carts ? '1. Tambah ke Keranjang' : 'Fitur pemesanan akan tersedia pada tahap berikutnya.'}${navigation}`,
       ids: [],
       fingerprint: '',
       pageCount: 1,

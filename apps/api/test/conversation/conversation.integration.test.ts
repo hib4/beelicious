@@ -63,6 +63,8 @@ afterEach(async () => {
     where: { accountId: { in: [...accounts] } },
   });
   const sessions = { identity: { accountId: { in: [...accounts] } } };
+  await client.cartItem.deleteMany({ where: { cart: { session: sessions } } });
+  await client.cart.deleteMany({ where: { session: sessions } });
   await client.conversationTurn.deleteMany({ where: { session: sessions } });
   await client.conversationSession.deleteMany({ where: sessions });
   await client.customerMessagingIdentity.deleteMany({
@@ -449,7 +451,52 @@ function cloudFixture() {
     },
   };
 }
-it('prepares Cloud commands through its preserved payload and worker entrypoints', async () => {
+async function transportCatalog() {
+  const tenant = await client.tenant.create({
+    data: { name: '! transport cart fixture', slug: randomUUID() },
+  });
+  tenants.add(tenant.id);
+  const category = await client.menuCategory.create({
+    data: { tenantId: tenant.id, name: 'Transport category' },
+  });
+  await client.menuItem.create({
+    data: {
+      tenantId: tenant.id,
+      categoryId: category.id,
+      name: 'Transport meal',
+      price: 20000,
+    },
+  });
+  return tenant;
+}
+async function addTransportCart(
+  active: EventScope,
+  tenantId: string,
+  sendText: (text: string) => Promise<void>,
+) {
+  let selected = await session(active);
+  for (let n = 0; selected.state === 'SELECT_TENANT' && n < 20; n++) {
+    const index = (selected.stateData as { options: string[] }).options.indexOf(
+      tenantId,
+    );
+    await sendText(index < 0 ? '9' : String(index + 1));
+    selected = await session(active);
+  }
+  await sendText('1'); // category
+  await sendText('1'); // details
+  await sendText('1'); // quantity prompt
+  await sendText('2'); // committed addition
+  const current = await session(active);
+  const cart = await client.cart.findFirstOrThrow({
+    where: { sessionId: current.id },
+    include: { items: true },
+  });
+  expect(current.state).toBe('CART_ACTION');
+  expect(cart.items).toHaveLength(1);
+  expect(cart.items[0]!.quantity).toBe(2);
+}
+it('prepares Cloud commands and cart additions through its preserved payload and worker entrypoints', async () => {
+  const tenant = await transportCatalog();
   const cloud = cloudFixture();
   const batch = cloud.batch(['Menu']);
   await store.receive(batch);
@@ -469,8 +516,17 @@ it('prepares Cloud commands through its preserved payload and worker entrypoints
   await w.tick();
   expect(sender.sendTextMessage).toHaveBeenCalledOnce();
   expect(sender.sendTextMessage.mock.calls[0]![1]).toContain('Selamat datang');
+  await addTransportCart(
+    { provider: 'cloud-api', accountId: cloud.accountId },
+    tenant.id,
+    async (text) => {
+      await store.receive(cloud.batch([text]));
+      await w.tick();
+    },
+  );
 });
-it('connects the real Baileys normalization and adapter to the engine with a mocked socket', async () => {
+it('connects real Baileys normalization to persisted cart additions with a mocked socket', async () => {
+  const tenant = await transportCatalog();
   const a = scope('baileys');
   const sock = socketFixture(),
     auth = authFixture();
@@ -533,6 +589,31 @@ it('connects the real Baileys normalization and adapter to the engine with a moc
     expect(sock.socket.sendMessage).toHaveBeenCalledOnce();
     expect(sock.socket.sendMessage.mock.calls[0]![1]).toMatchObject({
       text: expect.stringContaining('Selamat datang'),
+    });
+    await addTransportCart(a, tenant.id, async (text) => {
+      const expected = keys.size + 1;
+      sock.emit('messages.upsert', {
+        type: 'notify',
+        messages: [
+          {
+            key: {
+              id: randomUUID(),
+              remoteJid: `${PHONE}@s.whatsapp.net`,
+              fromMe: false,
+            },
+            message: { conversation: text },
+            messageTimestamp: Math.floor(Date.now() / 1000),
+          },
+        ],
+      });
+      await vi.waitFor(async () =>
+        expect(
+          await client.whatsAppEvent.count({
+            where: { dedupKey: { in: [...keys] } },
+          }),
+        ).toBe(expected),
+      );
+      await w.tick();
     });
   } finally {
     await w.stop();

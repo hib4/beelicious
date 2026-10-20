@@ -1,10 +1,15 @@
-import { Prisma, type PrismaClient } from '@beelicious/database';
+import {
+  Prisma,
+  isTransactionConflict,
+  type PrismaClient,
+} from '@beelicious/database';
 import { createCatalogServices } from '../catalog/services.js';
 import {
   CustomerService,
   type MessagingIdentity,
 } from '../customers/service.js';
 import { conversationInputSchema, type ConversationInput } from './commands.js';
+import { CartService } from '../cart/service.js';
 import { idle, initialData, stateDataSchema, transition } from './flow.js';
 
 export interface ConversationHandler {
@@ -18,6 +23,7 @@ export class ConversationEngine implements ConversationHandler {
   constructor(
     private readonly db: PrismaClient,
     private readonly now: () => Date = () => new Date(),
+    private readonly maxQuantity = 20,
   ) {}
   async handleIncomingMessage(
     eventId: string,
@@ -122,6 +128,10 @@ export class ConversationEngine implements ConversationHandler {
                   30 * 60 * 1000,
                 refresh: session.requiresRefresh || !parsed.success,
               },
+              {
+                service: new CartService(tx, this.maxQuantity),
+                scope: { customerId: customer.id, sessionId: session.id },
+              },
             );
             const { data, ...selection } = result.context;
             const version = session.version + 1;
@@ -155,12 +165,7 @@ export class ConversationEngine implements ConversationHandler {
           { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
         );
       } catch (error) {
-        if (
-          attempt < 2 &&
-          error instanceof Prisma.PrismaClientKnownRequestError &&
-          error.code === 'P2034'
-        )
-          continue;
+        if (attempt < 2 && isTransactionConflict(error)) continue;
         throw error;
       }
     }

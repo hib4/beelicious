@@ -4,7 +4,15 @@ import type { IncomingMessage } from '../messaging/types.js';
 
 export const commandSchema = z.discriminatedUnion('kind', [
   z.strictObject({
-    kind: z.enum(['start', 'back', 'cancel', 'help', 'invalid', 'empty']),
+    kind: z.enum([
+      'start',
+      'back',
+      'cancel',
+      'help',
+      'cart',
+      'invalid',
+      'empty',
+    ]),
   }),
   z.strictObject({
     kind: z.literal('select'),
@@ -18,6 +26,7 @@ export function parseCommand(text: string): Command {
   if (['halo', 'hi', 'mulai', 'menu'].includes(input)) return { kind: 'start' };
   if (['0', 'kembali'].includes(input)) return { kind: 'back' };
   if (input === 'batal') return { kind: 'cancel' };
+  if (input === 'keranjang') return { kind: 'cart' };
   if (input === 'bantuan') return { kind: 'help' };
   if (/^[1-9]\d{0,9}$/.test(input) && Number(input) <= 2147483647)
     return { kind: 'select', value: Number(input) };

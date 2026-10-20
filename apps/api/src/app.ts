@@ -80,7 +80,11 @@ export function buildApp(
     throw new Error('Conversation persistence is required');
   const conversation =
     config.conversationEnabled && prisma
-      ? new ConversationEngine(prisma, dependencies.now)
+      ? new ConversationEngine(
+          prisma,
+          dependencies.now,
+          config.CART_MAX_ITEM_QUANTITY,
+        )
       : undefined;
   let worker: ReturnType<typeof createWorker> | undefined;
   let messaging: MessagingRuntime | undefined;

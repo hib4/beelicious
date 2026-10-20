@@ -43,6 +43,7 @@ model Tenant {
   isActive    Boolean               @default(true)
   createdAt   DateTime              @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime              @default(now()) @updatedAt @db.Timestamptz(3)
+  carts       Cart[]
   sessions    ConversationSession[]
   categories  MenuCategory[]
   menuItems   MenuItem[]
@@ -82,8 +83,10 @@ model MenuItem {
   createdAt   DateTime     @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime     @default(now()) @updatedAt @db.Timestamptz(3)
 
-  sessions ConversationSession[]
+  cartItems CartItem[]
+  sessions  ConversationSession[]
 
+  @@unique([tenantId, id])
   @@unique([tenantId, categoryId, id])
   @@index([tenantId, isAvailable, sortOrder, id])
   @@index([tenantId, categoryId, sortOrder, id])
@@ -94,6 +97,7 @@ model Customer {
   displayName String?                     @db.VarChar(120)
   createdAt   DateTime                    @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime                    @default(now()) @updatedAt @db.Timestamptz(3)
+  carts       Cart[]
   identities  CustomerMessagingIdentity[]
 }
 
@@ -105,11 +109,13 @@ model CustomerMessagingIdentity {
   accountId      String               @db.VarChar(512)
   providerUserId String               @db.VarChar(512)
   identifierType String               @db.VarChar(20)
+  carts          Cart[]
   session        ConversationSession?
   phoneNumber    String?              @db.VarChar(15)
   createdAt      DateTime             @default(now()) @db.Timestamptz(3)
   updatedAt      DateTime             @default(now()) @updatedAt @db.Timestamptz(3)
 
+  @@unique([id, customerId])
   @@unique([provider, accountId, providerUserId])
   @@index([customerId])
 }
@@ -120,6 +126,17 @@ enum ConversationState {
   SELECT_CATEGORY
   SELECT_MENU
   VIEW_MENU_ITEM
+  SELECT_QUANTITY
+  CART_ACTION
+  CART_REVIEW
+  CART_EDIT_QUANTITY
+  CART_EDIT_QUANTITY_INPUT
+  CART_REMOVE_ITEM
+  CART_READY
+  CART_CONFIRM_CLEAR
+  CART_CONFIRM_SWITCH
+  CART_CONFIRM_REOPEN
+  CART_CONFIRM_PRICE
 }
 
 model ConversationSession {
@@ -139,8 +156,10 @@ model ConversationSession {
   lastInteractionAt   DateTime                  @default(now()) @db.Timestamptz(3)
   createdAt           DateTime                  @default(now()) @db.Timestamptz(3)
   updatedAt           DateTime                  @default(now()) @updatedAt @db.Timestamptz(3)
+  carts               Cart[]
   turns               ConversationTurn[]
 
+  @@unique([id, messagingIdentityId])
   @@index([lastInteractionAt])
 }
 
@@ -155,4 +174,47 @@ model ConversationTurn {
   createdAt      DateTime            @default(now()) @db.Timestamptz(3)
 
   @@unique([sessionId, sessionVersion])
+}
+
+enum CartStatus {
+  ACTIVE
+  READY
+  ABANDONED
+}
+
+model Cart {
+  id                  String                    @id @default(uuid()) @db.Uuid
+  customerId          String                    @db.Uuid
+  messagingIdentityId String                    @db.Uuid
+  sessionId           String                    @db.Uuid
+  tenantId            String                    @db.Uuid
+  customer            Customer                  @relation(fields: [customerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  identity            CustomerMessagingIdentity @relation(fields: [messagingIdentityId, customerId], references: [id, customerId], onDelete: Restrict, onUpdate: Restrict)
+  session             ConversationSession       @relation(fields: [sessionId, messagingIdentityId], references: [id, messagingIdentityId], onDelete: Restrict, onUpdate: Restrict)
+  tenant              Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  status              CartStatus                @default(ACTIVE)
+  revision            Int                       @default(0)
+  createdAt           DateTime                  @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime                  @default(now()) @updatedAt @db.Timestamptz(3)
+  items               CartItem[]
+
+  @@unique([id, tenantId])
+  @@index([customerId, status])
+  @@index([sessionId, status])
+}
+
+model CartItem {
+  id         String   @id @default(uuid()) @db.Uuid
+  cartId     String   @db.Uuid
+  tenantId   String   @db.Uuid
+  menuItemId String   @db.Uuid
+  cart       Cart     @relation(fields: [cartId, tenantId], references: [id, tenantId], onDelete: Restrict, onUpdate: Restrict)
+  menuItem   MenuItem @relation(fields: [tenantId, menuItemId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict)
+  quantity   Int
+  unitPrice  Int
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@unique([cartId, menuItemId])
+  @@index([tenantId, menuItemId])
 }
