@@ -9,6 +9,7 @@ export type {
   ClaimedEvent,
   EventResult,
   EventState,
+  EventScope,
 } from './whatsapp-events.js';
 import { PrismaClient } from './generated/prisma/client.js';
 

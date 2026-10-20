@@ -1,6 +1,6 @@
 # Beelicious
 
-Phase 2 adds official Meta WhatsApp Cloud API communication to the TypeScript/Fastify modular monolith. PostgreSQL backs durable webhook receipt and processing. Warung Babe remains the planned pilot; tenant/menu/cart/order/payment functionality is not implemented.
+Phase 2B adds selectable Cloud API, Baileys, and mock messaging providers to the TypeScript/Fastify modular monolith. The official Meta WhatsApp Cloud API implementation remains available. PostgreSQL backs durable webhook receipt and processing. Warung Babe remains the planned pilot; tenant/menu/cart/order/payment functionality is not implemented.
 
 ## Prerequisites
 
@@ -111,22 +111,22 @@ ESM workspaces resolve through compiled package exports, not TypeScript aliases.
 
 WhatsApp is **disabled by default**. Phase 1 health endpoints and local setup work without Meta credentials. Enable it only after applying migrations and replacing the example placeholders in the ignored root `.env`.
 
-| Variable                     | Purpose                                                                          |
-| ---------------------------- | -------------------------------------------------------------------------------- |
-| `WHATSAPP_ENABLED`           | Literal `true` enables webhook routes and the PostgreSQL worker; default `false` |
-| `WHATSAPP_ACCESS_TOKEN`      | Meta access token; required when integration is enabled                          |
-| `WHATSAPP_PHONE_NUMBER_ID`   | Numeric ID of the Meta test sender, not its display phone number                 |
-| `WHATSAPP_WABA_ID`           | Numeric WhatsApp Business Account ID                                             |
-| `WHATSAPP_VERIFY_TOKEN`      | Your own private random webhook verification token                               |
-| `META_APP_SECRET`            | App secret from the same Meta app that signs deliveries; not the verify token    |
-| `META_GRAPH_API_VERSION`     | Required version in `vNN.0` form; no runtime fallback                            |
-| `WHATSAPP_TEST_BOT_ENABLED`  | Literal `true` enables greetings; default `false`; only allowed in development   |
-| `WHATSAPP_TEST_RECIPIENTS`   | Comma-separated approved customer numbers in international digits-only format    |
-| `WHATSAPP_TEST_DATABASE_URL` | Optional override for the separate integration database; must end in `_test`     |
+| Variable                     | Purpose                                                                             |
+| ---------------------------- | ----------------------------------------------------------------------------------- |
+| `WHATSAPP_ENABLED`           | Literal `true` enables the selected provider and PostgreSQL worker; default `false` |
+| `WHATSAPP_ACCESS_TOKEN`      | Meta access token; required when Cloud API is enabled                               |
+| `WHATSAPP_PHONE_NUMBER_ID`   | Numeric ID of the Meta test sender, not its display phone number                    |
+| `WHATSAPP_WABA_ID`           | Numeric WhatsApp Business Account ID                                                |
+| `WHATSAPP_VERIFY_TOKEN`      | Your own private random webhook verification token                                  |
+| `META_APP_SECRET`            | App secret from the same Meta app that signs deliveries; not the verify token       |
+| `META_GRAPH_API_VERSION`     | Required version in `vNN.0` form; no runtime fallback                               |
+| `WHATSAPP_TEST_BOT_ENABLED`  | Literal `true` enables greetings; default `false`; only allowed in development      |
+| `WHATSAPP_TEST_RECIPIENTS`   | Comma-separated approved customer numbers in international digits-only format       |
+| `WHATSAPP_TEST_DATABASE_URL` | Optional override for the separate integration database; must end in `_test`        |
 
 The example selects **v26.0 as a compatibility target**. This version has not been tested against a live Meta account. The main Meta documentation host returned HTTP 429 during implementation; verify the selected version is available in your app before live testing. The endpoint and payload conventions follow Meta's official collection linked below. Do not silently fall back to another API version.
 
-With WhatsApp enabled, all six Meta settings are mandatory. An enabled greeting bot also requires `NODE_ENV=development` and a nonempty allowlist; production/test startup rejects that bot setting. Automated worker tests construct development configuration with synthetic credentials and mocked transport. Disabled WhatsApp settings do not affect health checks. Configuration failures print field names only.
+With WhatsApp enabled and `MESSAGING_PROVIDER=cloud-api` (the default), all six Meta settings are mandatory. Inactive providers require no credentials. An enabled greeting bot also requires `NODE_ENV=development` and a nonempty allowlist; production/test startup rejects that bot setting. Automated worker tests construct development configuration with synthetic credentials and mocked transport. Disabled WhatsApp settings do not affect health checks. Configuration failures print field names only.
 
 ### Meta dashboard and HTTPS callback
 
@@ -191,4 +191,92 @@ By default, WhatsApp integration tests and `db:migrate:test` derive the database
 - **`pending`/`processing`:** verify PostgreSQL and migrations, that the API is actually listening, and allow up to 30 seconds for an interrupted lease to expire. `sending` after a crash becomes `uncertain`; it is not automatically resent.
 - **Delivery failure after HTTP success:** inspect separate status-event counts/state using the safe CLI. The CLI includes recognized delivery statuses and numeric error codes while excluding private payload fields. Do not dump sender numbers, raw data, or message identifiers into shared logs. Statuses can arrive out of order; this phase records events independently instead of assuming a monotonic delivery state.
 
-No tenant/menu data, carts, scheduling, orders, payments, authentication, dashboards, AI features, production phone registration, or production deployment are implemented in Phase 2.
+No tenant/menu data, carts, scheduling, orders, payments, user authentication, dashboards, AI features, production phone registration, or production deployment are implemented in Phase 2B.
+
+## Phase 2B: messaging providers
+
+Baileys is temporarily available for local development and internal testing because the Meta Business account is restricted. It is **unofficial**, is not affiliated with WhatsApp, can stop working after protocol changes, and may lead to account restrictions. Use a dedicated internal test account and explicitly approved contacts. There is no platform evasion, bulk messaging, or production support.
+
+### Architecture and provider selection
+
+`apps/api/src/modules/messaging` defines normalized text inputs, sending results/errors, delivery updates, greeting classification, and the shared durable worker. Provider payload parsing stays inside adapters; future conversation code can consume normalized inputs without depending on Meta payloads or Baileys objects. The existing Cloud client, HMAC/raw-byte webhook verification, verification route, Graph configuration, and safe rate-limit retry behavior remain in `modules/whatsapp`.
+
+Exactly one provider runs. `WHATSAPP_ENABLED=false` remains the default master switch. `MESSAGING_PROVIDER` defaults to `cloud-api`; setting it alone does not enable messaging. Switching providers requires a server restart. The worker claims only its provider/account scope, including compatible legacy Cloud rows, so another provider's pending messages remain untouched. Existing Cloud deduplication keys are preserved. New providers use account/provider-scoped keys in the existing `WhatsAppEvent` table; no new migration or business model is needed.
+
+| Variable                        | Default                 | Behavior                                                |
+| ------------------------------- | ----------------------- | ------------------------------------------------------- |
+| `MESSAGING_PROVIDER`            | `cloud-api`             | `cloud-api`, `baileys`, or `mock`                       |
+| `WHATSAPP_ENABLED`              | `false`                 | Master switch for the selected provider                 |
+| `WHATSAPP_TEST_BOT_ENABLED`     | `false`                 | Greeting replies require this flag and development mode |
+| `BAILEYS_AUTH_DIR`              | `./.local/baileys-auth` | Private local linked-device session directory           |
+| `BAILEYS_ALLOWED_TEST_CONTACTS` | empty                   | Comma-separated international digits-only phone numbers |
+| `WHATSAPP_TEST_RECIPIENTS`      | empty                   | Approved contacts for Cloud API and mock greetings      |
+
+Only the active provider's settings are validated. Baileys is rejected outside `NODE_ENV=development`; it and mock require no Meta settings. `DATABASE_URL` remains required for every provider. An enabled greeting bot requires a nonempty active-provider allowlist. Configuration errors report field names only.
+
+### Connect Baileys with QR authentication
+
+1. Apply existing migrations with `npm run db:migrate`.
+2. Edit the ignored root `.env`:
+
+   ```dotenv
+   NODE_ENV=development
+   WHATSAPP_ENABLED=true
+   MESSAGING_PROVIDER=baileys
+   WHATSAPP_TEST_BOT_ENABLED=true
+   BAILEYS_AUTH_DIR=./.local/baileys-auth
+   BAILEYS_ALLOWED_TEST_CONTACTS=REPLACE_WITH_APPROVED_TEST_NUMBER
+   ```
+
+   Replace the allowlist placeholder with the test customer's international number, digits only. Keep the existing database configuration. Meta credentials may remain unset.
+
+3. Run `npm run dev` in an interactive local terminal. A QR code appears only there; QR material is excluded from structured logs and HTTP endpoints. Redirected/noninteractive output emits `baileys_qr_requires_terminal` instead. No HTTPS tunnel or webhook subscription is required.
+4. On the account being linked, open WhatsApp **Linked Devices**, choose **Link a Device**, and scan the QR. This does not override a WhatsApp account restriction.
+5. Wait for the sanitized `baileys_connected` event. From a separate approved customer account, send `Halo` or `  hI  `. Each new message should receive exactly:
+
+   ```text
+   Halo! Selamat datang di Beelicious 🐝
+
+   Koneksi WhatsApp berhasil. Fitur pemesanan makanan akan segera tersedia.
+   ```
+
+6. Send unsupported text, a group message, or a message from an unapproved contact: expect no reply. Outgoing echoes and delivery updates never become incoming commands.
+7. Stop with Ctrl+C and restart with the same auth directory. A valid saved session should reconnect without scanning again. Send a new greeting after reconnection and confirm one reply. `npm run whatsapp:events` safely inspects processing states without printing message text, sender numbers, or private provider IDs.
+
+Baileys is pinned to `@whiskeysockets/baileys@7.0.0-rc14`; the implementation follows its installed types and APIs. Text sends use `sendMessage(jid, { text })`. PN JIDs and opaque LIDs are preserved for routing. LID approval requires a phone alias authenticated in the incoming envelope or a mapping known to Baileys; unknown LIDs are ignored, never treated as phone numbers. Supported inbound forms are original `conversation` and `extendedTextMessage.text`; media, captions, protocol edits, wrappers, groups, broadcasts, and newsletters are ignored.
+
+Only fresh `notify` messages are accepted: timestamps must be at or after process startup, with five seconds of clock skew allowed. History, append, and placeholder-recovery events are ignored. Messages sent while the server was stopped may receive no reply. Already committed inbox work can recover after restart and retains the existing 24-hour expiry.
+
+### Session storage, lifecycle, and recovery
+
+The entire `.local/` directory is ignored by Git. Auth data contains long-lived credentials and Signal keys: do not copy it into source folders, public directories, screenshots, logs, or shared backups. Paths inside this checkout must be below `.local/`; an absolute path outside the checkout is also supported. The directory is private (`0700`), credential files are restricted (`0600`), and auth updates are serialized and drained during shutdown. Local filesystem storage is unencrypted and suitable only for local testing, not production or shared/network storage.
+
+One process owns an auth directory through `proper-lockfile`'s atomic lock and heartbeat. A second process is refused; after a crash stale-lock recovery can take up to 60 seconds. Do not manually remove a live lock. Avoid running multiple clones against the same linked account, even with separate directories. A compromised lock stops the adapter.
+
+Transient disconnects have six bounded reconnect attempts with delays of 1, 2, 4, 8, 16, and 30 seconds. A connection stable for 60 seconds resets that budget. Pairing restart-required events replace the socket separately with a bounded allowance. Old listeners are removed before replacement. Logout, bad sessions, replaced connections, and authentication failures stop automatic reconnection. Workers start only after listening and send only while connected. Shutdown stops ingress and worker activity before socket/auth cleanup and database disconnect.
+
+Invalid/corrupt sessions are preserved and reported through sanitized events such as `baileys_auth_invalid_or_locked`, `baileys_auth_failure`, or `baileys_session_stopped`. Stop the server, confirm no process owns the directory, and deliberately move the old directory aside privately before pairing with a fresh directory. There is no automatic credential deletion, logout, or inbox reset. Never reset `uncertain` records to pending.
+
+Database uniqueness and leases suppress duplicate processing, including competing workers. A `sending` record whose lease expires becomes `uncertain`, without another send. Baileys send timeouts/errors after invocation are uncertain and never automatically retried. Protocol resend support is disabled for this phase. Sending acceptance does not prove phone delivery; delivery updates are recorded separately. There is no exactly-once guarantee across PostgreSQL and WhatsApp.
+
+A Baileys event has no equivalent of the application's durable HTTP acknowledgement to Meta. If inbound persistence fails, the adapter halts rather than continuing silently, but replay of the uncommitted event is not guaranteed. Investigate the database, restart deliberately, and send a **new** test greeting after recovery. Local auth file writes are not crash-atomic; corruption can require relinking.
+
+### Switch back to Cloud API
+
+Stop the server; set `MESSAGING_PROVIDER=cloud-api`, retain `WHATSAPP_ENABLED=true`, and restore all existing Meta credentials and approved recipients described above. Restart and follow the original HTTPS webhook checklist. No Baileys socket or authentication storage is initialized when Cloud API is selected. Baileys pending inbox work remains isolated. The existing `whatsapp:send` CLI remains **Cloud-only**, sending only the fixed greeting to the first approved Cloud recipient; it is a deliberate live action. Do not use it as a Baileys connectivity test.
+
+### Mock and automated testing
+
+Set `MESSAGING_PROVIDER=mock` and `WHATSAPP_ENABLED=true` to start without a WhatsApp connection. For greeting tests also set development mode, `WHATSAPP_TEST_BOT_ENABLED=true`, and `WHATSAPP_TEST_RECIPIENTS`. There is no HTTP injection/send endpoint. Automated tests inject normalized messages through `createMockAdapter().inject(...)`, inspect its in-memory `outgoing` records, and use the shared worker for replies. Records disappear on process exit; message content is not written to application logs or a persistent mock-output file.
+
+```bash
+npm exec vitest run apps/api/test/messaging
+npm run db:migrate:test
+npm run test:integration
+```
+
+Unit tests use injected socket/auth implementations, never live WhatsApp. Database-connected tests use the existing separate `_test` database and mock all transports, including Baileys' real adapter with an injected socket. They cover concurrent duplicates, account/provider isolation, legacy Cloud rows, restart/lease recovery, ambiguous sends, normalization, filtering, QR handling, auth corruption/restoration, bounded reconnects, and shutdown.
+
+**Live status: unverified.** No real-device QR pairing, inbound reception, phone delivery, or session restoration has been demonstrated by automated tests. Repeat the manual checklist above with an approved device; also confirm Cloud callback/delivery separately once Meta account access is restored. Phase 3 has not started.
+
+References: [Baileys v7 migration](https://baileys.wiki/migration/v7), [session management](https://baileys.wiki/authentication/session-management), [sending text](https://baileys.wiki/messaging/sending-messages), and [versioned upstream example](https://github.com/WhiskeySockets/Baileys/blob/v7.0.0-rc14/Example/example.ts).

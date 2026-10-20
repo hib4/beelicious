@@ -35,6 +35,11 @@ if (!url.pathname.endsWith('_test'))
 const client = createPrismaClient(url.toString());
 const db = createDatabase(url.toString());
 const store = db.whatsappEvents;
+const cloudScope = {
+  provider: 'cloud-api' as const,
+  accountId: `${whatsapp.wabaId}:${whatsapp.phoneNumberId}`,
+  legacyCloud: whatsapp,
+};
 let NOW = new Date();
 beforeEach(() => {
   NOW = new Date(Date.now() + 1000);
@@ -178,7 +183,7 @@ it('processes accepted work after closing the first application and opening a ne
 it('reclaims interrupted pre-send work and prevents the expired owner from sending', async () => {
   const { events } = receive();
   await store.receive(events);
-  const old = await store.claim(NOW, 'old-owner');
+  const old = await store.claim(NOW, 'old-owner', cloudScope);
   expect(old).toBeDefined();
   const later = new Date(NOW.getTime() + 31000);
   const recovered = worker(store, () => later);
@@ -190,7 +195,7 @@ it('reclaims interrupted pre-send work and prevents the expired owner from sendi
 it('never resends an interrupted in-flight send after its lease expires', async () => {
   const { events } = receive();
   await store.receive(events);
-  const claimed = await store.claim(NOW, 'interrupted');
+  const claimed = await store.claim(NOW, 'interrupted', cloudScope);
   expect(await store.beginSend(claimed!.id, 'interrupted', NOW)).toBe(true);
   const recovered = worker(store, () => new Date(NOW.getTime() + 31000));
   await recovered.instance.tick();

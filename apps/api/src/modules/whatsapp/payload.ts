@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
+import { isGreeting, type IncomingMessage } from '../messaging/types.js';
+import { cloudAccountId } from '../messaging/providers/cloud-api.js';
 import type { ReceivedEvent } from '@beelicious/database';
 import type { WhatsAppConfig } from '../../config.js';
 
@@ -68,19 +70,30 @@ export function parsePayload(
       if (value.metadata.phone_number_id !== config.phoneNumberId) continue;
       const scope = [entry.id, value.metadata.phone_number_id];
       for (const message of value.messages ?? []) {
-        const normalized = message.text?.body.trim().toLowerCase();
+        const normalized: IncomingMessage = {
+          provider: 'cloud-api',
+          accountId: cloudAccountId(config),
+          messageId: message.id,
+          chatId: message.from,
+          senderId: message.from,
+          senderPhone: message.from,
+          text: message.text?.body ?? '',
+          timestamp: Number(message.timestamp) * 1000,
+          type: 'text',
+          direction: 'incoming',
+        };
         const isSelf =
           message.from ===
           value.metadata.display_phone_number?.replace(/\D/g, '');
         // Classify only the greeting; never retain arbitrary text or contact profiles.
         const greeting =
-          !isSelf &&
-          message.type === 'text' &&
-          (normalized === 'halo' || normalized === 'hi');
+          !isSelf && message.type === 'text' && isGreeting(normalized.text);
         events.push({
           dedupKey: key(['message', ...scope, message.id]),
           kind: 'message',
           data: {
+            provider: 'cloud-api',
+            accountId: cloudAccountId(config),
             wabaId: entry.id,
             phoneNumberId: value.metadata.phone_number_id,
             sender: message.from,
@@ -104,6 +117,8 @@ export function parsePayload(
           ]),
           kind: 'status',
           data: {
+            provider: 'cloud-api',
+            accountId: cloudAccountId(config),
             messageId: status.id,
             status: status.status,
             timestamp: status.timestamp,

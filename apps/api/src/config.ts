@@ -1,4 +1,7 @@
 import { z } from 'zod';
+import { relative, resolve, isAbsolute } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { MessagingProvider } from './modules/messaging/types.js';
 
 const environmentSchema = z.object({
   NODE_ENV: z
@@ -15,6 +18,9 @@ const flag = z
   .default('false')
   .transform((value) => value === 'true');
 const flagsSchema = z.object({
+  MESSAGING_PROVIDER: z
+    .enum(['cloud-api', 'baileys', 'mock'])
+    .default('cloud-api'),
   WHATSAPP_ENABLED: flag,
   WHATSAPP_TEST_BOT_ENABLED: flag,
 });
@@ -46,9 +52,38 @@ export interface WhatsAppConfig {
   testBotEnabled: boolean;
   testRecipients: string[];
 }
+export interface MessagingConfig {
+  provider: MessagingProvider;
+  testBotEnabled: boolean;
+  testRecipients: string[];
+  authDir?: string;
+}
+const contactsSchema = z
+  .string()
+  .default('')
+  .transform((value) =>
+    value
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean),
+  )
+  .pipe(z.array(z.string().regex(/^[1-9]\d{6,14}$/)));
 export type Config = z.infer<typeof environmentSchema> & {
   whatsapp?: WhatsAppConfig;
+  messaging?: MessagingConfig;
 };
+function validAuthPath(path: string): boolean {
+  if (!path.trim() || path.includes('\0')) return false;
+  const root = fileURLToPath(new URL('../../../', import.meta.url));
+  const destination = resolve(path);
+  const inside = relative(root, destination);
+  // Within a checkout, credentials belong only below the ignored .local directory.
+  return (
+    isAbsolute(inside) ||
+    inside.startsWith('../') ||
+    inside.startsWith('.local/')
+  );
+}
 function invalid(fields: string[]): never {
   throw new Error(
     `Invalid environment configuration: ${[...new Set(fields)].join(', ')}`,
@@ -72,6 +107,34 @@ export function parseEnvironment(
       invalid(['WHATSAPP_TEST_BOT_ENABLED']);
     return result.data;
   }
+  const provider = flags.data.MESSAGING_PROVIDER;
+  if (provider !== 'cloud-api') {
+    const contactsField =
+      provider === 'baileys'
+        ? 'BAILEYS_ALLOWED_TEST_CONTACTS'
+        : 'WHATSAPP_TEST_RECIPIENTS';
+    const contacts = contactsSchema.safeParse(environment[contactsField]);
+    if (!contacts.success) invalid([contactsField]);
+    if (provider === 'baileys' && result.data.NODE_ENV !== 'development')
+      invalid(['NODE_ENV', 'MESSAGING_PROVIDER']);
+    if (
+      flags.data.WHATSAPP_TEST_BOT_ENABLED &&
+      (result.data.NODE_ENV !== 'development' || contacts.data.length === 0)
+    )
+      invalid(['WHATSAPP_TEST_BOT_ENABLED', 'NODE_ENV', contactsField]);
+    const authDir = environment.BAILEYS_AUTH_DIR ?? './.local/baileys-auth';
+    if (provider === 'baileys' && !validAuthPath(authDir))
+      invalid(['BAILEYS_AUTH_DIR']);
+    return {
+      ...result.data,
+      messaging: {
+        provider,
+        testBotEnabled: flags.data.WHATSAPP_TEST_BOT_ENABLED,
+        testRecipients: contacts.data,
+        ...(provider === 'baileys' ? { authDir } : {}),
+      },
+    };
+  }
   const whatsapp = whatsappSchema.safeParse(environment);
   if (!whatsapp.success)
     invalid(whatsapp.error.issues.map((issue) => issue.path.join('.')));
@@ -89,6 +152,11 @@ export function parseEnvironment(
   }
   return {
     ...result.data,
+    messaging: {
+      provider,
+      testBotEnabled: flags.data.WHATSAPP_TEST_BOT_ENABLED,
+      testRecipients: values.WHATSAPP_TEST_RECIPIENTS,
+    },
     whatsapp: {
       accessToken: values.WHATSAPP_ACCESS_TOKEN,
       phoneNumberId: values.WHATSAPP_PHONE_NUMBER_ID,

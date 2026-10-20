@@ -6,6 +6,14 @@ import {
 import { registerWhatsAppRoutes } from './modules/whatsapp/routes.js';
 import { createWorker } from './modules/whatsapp/worker.js';
 import {
+  createMessagingRuntime,
+  type MessagingRuntime,
+} from './modules/messaging/runtime.js';
+import type {
+  AdapterCallbacks,
+  MessagingAdapter,
+} from './modules/messaging/types.js';
+import {
   createDatabase,
   type Database,
   type WhatsAppDatabase,
@@ -16,6 +24,10 @@ import type { Config } from './config.js';
 
 export interface AppDependencies {
   whatsappEvents?: WhatsAppEventStore;
+  messagingAdapterFactory?: (
+    callbacks: AdapterCallbacks,
+  ) => Promise<MessagingAdapter>;
+  qr?: (value: string) => void;
   sender?: TextSender;
   now?: () => Date;
   logger?: FastifyServerOptions['logger'];
@@ -52,6 +64,7 @@ export function buildApp(
           },
   });
   let worker: ReturnType<typeof createWorker> | undefined;
+  let messaging: MessagingRuntime | undefined;
   if (config.whatsapp) {
     const store =
       dependencies.whatsappEvents ??
@@ -75,9 +88,46 @@ export function buildApp(
       worker?.start();
     });
   }
+  if (config.messaging && config.messaging.provider !== 'cloud-api') {
+    const store =
+      dependencies.whatsappEvents ??
+      (database as Partial<WhatsAppDatabase>).whatsappEvents;
+    if (!store) throw new Error('Messaging event storage is required');
+    messaging = createMessagingRuntime(
+      config.messaging,
+      store,
+      config.NODE_ENV === 'development',
+      (event) => {
+        app.log.info({ event }, 'Messaging provider event');
+      },
+      {
+        ...(dependencies.messagingAdapterFactory
+          ? { adapterFactory: dependencies.messagingAdapterFactory }
+          : {}),
+        ...(dependencies.qr ? { qr: dependencies.qr } : {}),
+        ...(dependencies.now ? { now: dependencies.now } : {}),
+      },
+    );
+    app.addHook('onListen', async () => {
+      // Fastify reports onListen failures without failing listen; clean up explicitly.
+      try {
+        await messaging?.start();
+      } catch {
+        app.log.error(
+          { event: 'messaging_start_failed' },
+          'Messaging provider could not start',
+        );
+        await messaging?.stop();
+      }
+    });
+  }
   app.addHook('onClose', async () => {
     try {
-      await worker?.stop();
+      try {
+        await worker?.stop();
+      } finally {
+        await messaging?.stop();
+      }
     } finally {
       await database.disconnect();
     }

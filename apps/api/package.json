@@ -9,7 +9,10 @@
   "dependencies": {
     "@beelicious/database": "0.1.0",
     "@beelicious/shared": "0.1.0",
+    "@whiskeysockets/baileys": "7.0.0-rc14",
     "fastify": "5.12.7",
+    "proper-lockfile": "4.1.2",
+    "qrcode-terminal": "0.12.0",
     "zod": "4.6.7"
   }
 }

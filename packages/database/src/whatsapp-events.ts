@@ -1,4 +1,4 @@
-import type { PrismaClient, Prisma } from './generated/prisma/client.js';
+import { Prisma, type PrismaClient } from './generated/prisma/client.js';
 
 export type EventState =
   | 'pending'
@@ -25,9 +25,18 @@ export interface EventResult {
   outboundMessageId?: string;
   lastError?: string;
 }
+export interface EventScope {
+  provider: 'cloud-api' | 'baileys' | 'mock';
+  accountId: string;
+  legacyCloud?: { wabaId: string; phoneNumberId: string };
+}
 export interface WhatsAppEventStore {
   receive(events: ReceivedEvent[]): Promise<void>;
-  claim(now: Date, token: string): Promise<ClaimedEvent | undefined>;
+  claim(
+    now: Date,
+    token: string,
+    scope: EventScope,
+  ): Promise<ClaimedEvent | undefined>;
   beginSend(id: string, token: string, now: Date): Promise<boolean>;
   finish(id: string, token: string, result: EventResult): Promise<void>;
 }
@@ -42,25 +51,30 @@ export function createEventStore(client: PrismaClient): WhatsAppEventStore {
         });
       });
     },
-    async claim(now, token) {
+    async claim(now, token, scope) {
+      // Parameterized JSON metadata filters keep inactive accounts/providers pending.
+      const legacy = scope.legacyCloud;
+      const filter = Prisma.sql`(
+        ("data"->>'provider' = ${scope.provider} AND "data"->>'accountId' = ${scope.accountId})
+        OR (${scope.provider === 'cloud-api' && !!legacy} AND "data"->>'provider' IS NULL AND (
+          "kind" = 'status' OR ("data"->>'wabaId' = ${legacy?.wabaId ?? ''} AND "data"->>'phoneNumberId' = ${legacy?.phoneNumberId ?? ''})
+        ))
+      )`;
       const leaseUntil = new Date(now.getTime() + 30000);
       // Sending is never reclaimed for a second send: its result may be unknown.
-      await client.whatsAppEvent.updateMany({
-        where: { state: 'sending', leaseUntil: { lte: now } },
-        data: {
-          state: 'uncertain',
-          leaseToken: null,
-          leaseUntil: null,
-          lastError: 'interrupted_send',
-        },
-      });
+      await client.$executeRaw`
+        UPDATE "WhatsAppEvent"
+        SET "state" = 'uncertain', "leaseToken" = NULL, "leaseUntil" = NULL,
+            "lastError" = 'interrupted_send', "updatedAt" = ${now}
+        WHERE ${filter} AND "state" = 'sending' AND "leaseUntil" <= ${now}
+      `;
       const rows = await client.$queryRaw<ClaimedEvent[]>`
         UPDATE "WhatsAppEvent" AS event
         SET "state" = 'processing', "leaseToken" = ${token}, "leaseUntil" = ${leaseUntil}, "updatedAt" = ${now}
         WHERE event."id" = (
           SELECT "id" FROM "WhatsAppEvent"
-          WHERE ("state" = 'pending' AND "availableAt" <= ${now})
-             OR ("state" = 'processing' AND "leaseUntil" <= ${now})
+          WHERE ${filter} AND (("state" = 'pending' AND "availableAt" <= ${now})
+             OR ("state" = 'processing' AND "leaseUntil" <= ${now}))
           ORDER BY "availableAt", "createdAt", "id"
           FOR UPDATE SKIP LOCKED LIMIT 1
         )
