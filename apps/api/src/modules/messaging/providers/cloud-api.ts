@@ -1,3 +1,4 @@
+import { sendCloudImage } from '../images.js';
 import type { WhatsAppConfig } from '../../../config.js';
 import {
   createWhatsAppClient,
@@ -28,6 +29,7 @@ export function createCloudAdapter(
     async approved(chatId) {
       return config.testRecipients.includes(chatId);
     },
+    sendImage: (message, signal) => sendCloudImage(config, message, signal),
     async sendText(message, signal) {
       if (
         !phoneSchema.safeParse(message.chatId).success ||

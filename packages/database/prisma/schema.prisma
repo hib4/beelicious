@@ -35,18 +35,21 @@ model WhatsAppEvent {
 }
 
 model Tenant {
-  id          String                @id @default(uuid()) @db.Uuid
-  name        String                @db.VarChar(120)
-  slug        String                @unique @db.VarChar(100)
-  description String?               @db.VarChar(2000)
-  logoUrl     String?               @db.VarChar(2048)
-  isActive    Boolean               @default(true)
-  createdAt   DateTime              @default(now()) @db.Timestamptz(3)
-  updatedAt   DateTime              @default(now()) @updatedAt @db.Timestamptz(3)
-  carts       Cart[]
-  sessions    ConversationSession[]
-  categories  MenuCategory[]
-  menuItems   MenuItem[]
+  id             String                @id @default(uuid()) @db.Uuid
+  name           String                @db.VarChar(120)
+  slug           String                @unique @db.VarChar(100)
+  description    String?               @db.VarChar(2000)
+  logoUrl        String?               @db.VarChar(2048)
+  isActive       Boolean               @default(true)
+  createdAt      DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime              @default(now()) @updatedAt @db.Timestamptz(3)
+  operatingHours TenantOperatingHour[]
+  pickupSlots    PickupSlot[]
+  orders         Order[]
+  carts          Cart[]
+  sessions       ConversationSession[]
+  categories     MenuCategory[]
+  menuItems      MenuItem[]
 
   @@index([isActive, name, id])
 }
@@ -83,8 +86,9 @@ model MenuItem {
   createdAt   DateTime     @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime     @default(now()) @updatedAt @db.Timestamptz(3)
 
-  cartItems CartItem[]
-  sessions  ConversationSession[]
+  orderItems OrderItem[]
+  cartItems  CartItem[]
+  sessions   ConversationSession[]
 
   @@unique([tenantId, id])
   @@unique([tenantId, categoryId, id])
@@ -97,6 +101,7 @@ model Customer {
   displayName String?                     @db.VarChar(120)
   createdAt   DateTime                    @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime                    @default(now()) @updatedAt @db.Timestamptz(3)
+  orders      Order[]
   carts       Cart[]
   identities  CustomerMessagingIdentity[]
 }
@@ -109,6 +114,7 @@ model CustomerMessagingIdentity {
   accountId      String               @db.VarChar(512)
   providerUserId String               @db.VarChar(512)
   identifierType String               @db.VarChar(20)
+  orders         Order[]
   carts          Cart[]
   session        ConversationSession?
   phoneNumber    String?              @db.VarChar(15)
@@ -137,6 +143,12 @@ enum ConversationState {
   CART_CONFIRM_SWITCH
   CART_CONFIRM_REOPEN
   CART_CONFIRM_PRICE
+  SELECT_PICKUP
+  CONFIRM_CHECKOUT
+  AWAITING_PAYMENT
+  ORDER_CONFIRMED
+  PAYMENT_UNSUCCESSFUL
+  REQUIRES_REVIEW
 }
 
 model ConversationSession {
@@ -156,6 +168,7 @@ model ConversationSession {
   lastInteractionAt   DateTime                  @default(now()) @db.Timestamptz(3)
   createdAt           DateTime                  @default(now()) @db.Timestamptz(3)
   updatedAt           DateTime                  @default(now()) @updatedAt @db.Timestamptz(3)
+  orders              Order[]
   carts               Cart[]
   turns               ConversationTurn[]
 
@@ -180,6 +193,7 @@ enum CartStatus {
   ACTIVE
   READY
   ABANDONED
+  CHECKED_OUT
 }
 
 model Cart {
@@ -196,9 +210,11 @@ model Cart {
   revision            Int                       @default(0)
   createdAt           DateTime                  @default(now()) @db.Timestamptz(3)
   updatedAt           DateTime                  @default(now()) @updatedAt @db.Timestamptz(3)
+  order               Order?
   items               CartItem[]
 
   @@unique([id, tenantId])
+  @@unique([id, customerId, sessionId, messagingIdentityId])
   @@index([customerId, status])
   @@index([sessionId, status])
 }
@@ -217,4 +233,205 @@ model CartItem {
 
   @@unique([cartId, menuItemId])
   @@index([tenantId, menuItemId])
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  CONFIRMED
+  CANCELLED
+  EXPIRED
+  REQUIRES_REVIEW
+}
+
+enum PaymentStatus {
+  INITIATING
+  PENDING
+  SUCCEEDED
+  FAILED
+  EXPIRED
+  CANCELLED
+  REQUIRES_REVIEW
+}
+
+enum ReservationStatus {
+  HELD
+  CONFIRMED
+  RELEASED
+}
+
+model TenantOperatingHour {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  dayOfWeek Int
+  opensAt   Int
+  closesAt  Int
+  timezone  String   @default("Asia/Jakarta") @db.VarChar(100)
+  isClosed  Boolean  @default(false)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([tenantId, dayOfWeek])
+}
+
+model PickupSlot {
+  id            String              @id @default(uuid()) @db.Uuid
+  tenantId      String              @db.Uuid
+  tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  startsAt      DateTime            @db.Timestamptz(3)
+  endsAt        DateTime            @db.Timestamptz(3)
+  reservedCount Int                 @default(0)
+  capacity      Int
+  isAvailable   Boolean             @default(true)
+  createdAt     DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime            @updatedAt @db.Timestamptz(3)
+  reservations  PickupReservation[]
+  orders        Order[]
+
+  @@unique([tenantId, startsAt, endsAt])
+  @@unique([id, tenantId])
+  @@index([tenantId, startsAt])
+}
+
+model Order {
+  id                  String                    @id @default(uuid()) @db.Uuid
+  orderNumber         String                    @unique @db.VarChar(50)
+  customerId          String                    @db.Uuid
+  customer            Customer                  @relation(fields: [customerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  messagingIdentityId String                    @db.Uuid
+  identity            CustomerMessagingIdentity @relation(fields: [messagingIdentityId, customerId], references: [id, customerId], onDelete: Restrict, onUpdate: Restrict)
+  sessionId           String                    @db.Uuid
+  session             ConversationSession       @relation(fields: [sessionId, messagingIdentityId], references: [id, messagingIdentityId], onDelete: Restrict, onUpdate: Restrict)
+  tenantId            String                    @db.Uuid
+  tenant              Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  tenantName          String                    @db.VarChar(120)
+  sourceCartId        String                    @unique @db.Uuid
+  sourceCart          Cart                      @relation(fields: [sourceCartId, tenantId], references: [id, tenantId], onDelete: Restrict, onUpdate: Restrict)
+  chatId              String                    @db.VarChar(512)
+  recipientPhone      String?                   @db.VarChar(15)
+  confirmationEventId String                    @unique
+  pickupSlotId        String                    @db.Uuid
+  pickupSlot          PickupSlot                @relation(fields: [pickupSlotId, tenantId], references: [id, tenantId], onDelete: Restrict, onUpdate: Restrict)
+  status              OrderStatus               @default(PENDING_PAYMENT)
+  subtotal            Int
+  totalAmount         Int
+  currency            String                    @default("IDR") @db.VarChar(3)
+  reviewReason        String?                   @db.VarChar(100)
+  placedAt            DateTime                  @default(now()) @db.Timestamptz(3)
+  confirmedAt         DateTime?                 @db.Timestamptz(3)
+  updatedAt           DateTime                  @updatedAt @db.Timestamptz(3)
+  items               OrderItem[]
+  reservation         PickupReservation?
+  payment             Payment?
+  notifications       CheckoutNotification[]
+
+  @@unique([id, tenantId])
+  @@unique([sourceCartId, tenantId])
+  @@unique([id, tenantId, pickupSlotId])
+  @@index([sessionId, placedAt])
+}
+
+model OrderItem {
+  id           String   @id @default(uuid()) @db.Uuid
+  orderId      String   @db.Uuid
+  tenantId     String   @db.Uuid
+  order        Order    @relation(fields: [orderId, tenantId], references: [id, tenantId], onDelete: Restrict, onUpdate: Restrict)
+  menuItemId   String   @db.Uuid
+  menuItem     MenuItem @relation(fields: [tenantId, menuItemId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict)
+  nameSnapshot String   @db.VarChar(120)
+  quantity     Int
+  unitPrice    Int
+  lineSubtotal Int
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([orderId, menuItemId])
+}
+
+model PickupReservation {
+  id           String            @id @default(uuid()) @db.Uuid
+  orderId      String            @unique @db.Uuid
+  tenantId     String            @db.Uuid
+  order        Order             @relation(fields: [orderId, tenantId], references: [id, tenantId], onDelete: Restrict, onUpdate: Restrict)
+  pickupSlotId String            @db.Uuid
+  pickupSlot   PickupSlot        @relation(fields: [pickupSlotId, tenantId], references: [id, tenantId], onDelete: Restrict, onUpdate: Restrict)
+  status       ReservationStatus @default(HELD)
+  expiresAt    DateTime          @db.Timestamptz(3)
+  createdAt    DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime          @updatedAt @db.Timestamptz(3)
+
+  @@unique([orderId, tenantId])
+  @@index([pickupSlotId, status])
+}
+
+model Payment {
+  id                    String                  @id @default(uuid()) @db.Uuid
+  orderId               String                  @unique @db.Uuid
+  order                 Order                   @relation(fields: [orderId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  provider              String                  @db.VarChar(20)
+  merchantId            String                  @db.VarChar(100)
+  providerOrderId       String                  @db.VarChar(100)
+  providerTransactionId String?                 @db.VarChar(100)
+  status                PaymentStatus           @default(INITIATING)
+  amount                Int
+  currency              String                  @default("IDR") @db.VarChar(3)
+  qrCodeUrl             String?                 @db.VarChar(2048)
+  expiresAt             DateTime                @db.Timestamptz(3)
+  paidAt                DateTime?               @db.Timestamptz(3)
+  creationStarted       Boolean                 @default(false)
+  cancelRequested       Boolean                 @default(false)
+  checkedAt             DateTime?               @db.Timestamptz(3)
+  availableAt           DateTime                @default(now()) @db.Timestamptz(3)
+  leaseToken            String?
+  leaseUntil            DateTime?               @db.Timestamptz(3)
+  failures              Int                     @default(0)
+  createdAt             DateTime                @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime                @updatedAt @db.Timestamptz(3)
+  events                PaymentEvent[]
+  mockTransaction       MockPaymentTransaction?
+
+  @@unique([provider, merchantId, providerOrderId])
+  @@unique([provider, merchantId, providerTransactionId])
+  @@index([provider, merchantId, availableAt])
+}
+
+model PaymentEvent {
+  id               String    @id @default(uuid()) @db.Uuid
+  paymentId        String    @db.Uuid
+  payment          Payment   @relation(fields: [paymentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  provider         String    @db.VarChar(20)
+  eventKey         String    @db.VarChar(128)
+  eventType        String    @db.VarChar(50)
+  processingStatus String    @default("pending") @db.VarChar(20)
+  evidence         Json
+  receivedAt       DateTime  @default(now()) @db.Timestamptz(3)
+  processedAt      DateTime? @db.Timestamptz(3)
+
+  @@unique([provider, eventKey])
+}
+
+model MockPaymentTransaction {
+  paymentId     String   @id @db.Uuid
+  payment       Payment  @relation(fields: [paymentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  status        String   @default("pending") @db.VarChar(20)
+  transactionId String   @unique @db.VarChar(100)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(3)
+}
+
+model CheckoutNotification {
+  id          String    @id @default(uuid()) @db.Uuid
+  orderId     String    @db.Uuid
+  order       Order     @relation(fields: [orderId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  logicalKey  String    @unique @db.VarChar(150)
+  kind        String    @db.VarChar(20)
+  text        String    @db.VarChar(4096)
+  state       String    @default("pending") @db.VarChar(20)
+  attempts    Int       @default(0)
+  availableAt DateTime  @default(now()) @db.Timestamptz(3)
+  leaseToken  String?
+  leaseUntil  DateTime? @db.Timestamptz(3)
+  messageId   String?
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
+
+  @@index([state, availableAt])
 }

@@ -1,3 +1,7 @@
+import {
+  parseCheckout,
+  type CheckoutConfig,
+} from './modules/checkout/config.js';
 import { z } from 'zod';
 import { relative, resolve, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -75,6 +79,7 @@ export type Config = Omit<
   'CART_MAX_ITEM_QUANTITY'
 > & {
   CART_MAX_ITEM_QUANTITY?: number;
+  checkout?: CheckoutConfig;
   conversationEnabled?: boolean;
   whatsapp?: WhatsAppConfig;
   messaging?: MessagingConfig;
@@ -99,6 +104,7 @@ function invalid(fields: string[]): never {
 export function parseEnvironment(
   environment: Record<string, string | undefined>,
 ): Config {
+  const checkout = parseCheckout(environment);
   const result = environmentSchema.safeParse(environment);
   if (!result.success) {
     const fields = [
@@ -146,6 +152,7 @@ export function parseEnvironment(
       invalid(['BAILEYS_AUTH_DIR']);
     return {
       ...result.data,
+      ...(checkout ? { checkout } : {}),
       conversationEnabled: flags.data.CONVERSATION_ENABLED,
       messaging: {
         provider,
@@ -172,6 +179,7 @@ export function parseEnvironment(
   }
   return {
     ...result.data,
+    ...(checkout ? { checkout } : {}),
     conversationEnabled: flags.data.CONVERSATION_ENABLED,
     messaging: {
       provider,

@@ -49,6 +49,19 @@ export async function seedDevelopmentCatalog(client: PrismaClient) {
       if (item.tenantId !== tenant.id || item.categoryId !== categoryId)
         throw new Error('Development seed identifier conflict');
     }
+    // Development assumptions only: daily 07:00–18:00 Asia/Jakarta.
+    for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek++)
+      await tx.tenantOperatingHour.upsert({
+        where: { tenantId_dayOfWeek: { tenantId: tenant.id, dayOfWeek } },
+        create: {
+          tenantId: tenant.id,
+          dayOfWeek,
+          opensAt: 420,
+          closesAt: 1080,
+          timezone: 'Asia/Jakarta',
+        },
+        update: {},
+      });
     return { tenantId: tenant.id };
   });
 }

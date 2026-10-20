@@ -11,6 +11,7 @@ import { createInboxWorker, type Worker } from './worker.js';
 import { createMockAdapter } from './providers/mock.js';
 
 export interface MessagingRuntime {
+  adapter(): MessagingAdapter | undefined;
   start(): Promise<void>;
   stop(): Promise<void>;
 }
@@ -94,6 +95,7 @@ export function createMessagingRuntime(
     if (!stopping) worker.start();
   }
   return {
+    adapter: () => adapter,
     start() {
       startup ??= start();
       return startup;

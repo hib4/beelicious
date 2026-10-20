@@ -30,7 +30,9 @@
     "db:migrate:test": "node scripts/migrate-test-database.mjs",
     "whatsapp:send": "node --import ./scripts/load-env.mjs --import tsx apps/api/src/modules/whatsapp/send-cli.ts",
     "whatsapp:events": "node --import ./scripts/load-env.mjs --import tsx apps/api/src/modules/whatsapp/events-cli.ts",
-    "db:seed": "npm run seed -w @beelicious/database"
+    "db:seed": "npm run seed -w @beelicious/database",
+    "payment:mock": "node --import ./scripts/load-env.mjs --import tsx apps/api/src/modules/checkout/mock-cli.ts",
+    "payment:inspect": "node --import ./scripts/load-env.mjs --import tsx apps/api/src/modules/checkout/inspect-cli.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

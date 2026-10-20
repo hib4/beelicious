@@ -78,3 +78,16 @@ export type {
 export type { Cart, CartItem, CartStatus } from './generated/prisma/client.js';
 
 export { isTransactionConflict } from './transactions.js';
+
+export type {
+  Order,
+  OrderItem,
+  Payment,
+  PaymentEvent,
+  PickupSlot,
+  PickupReservation,
+  TenantOperatingHour,
+  CheckoutNotification,
+  PaymentStatus,
+  OrderStatus,
+} from './generated/prisma/client.js';

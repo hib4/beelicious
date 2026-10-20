@@ -10,6 +10,8 @@ export const commandSchema = z.discriminatedUnion('kind', [
       'cancel',
       'help',
       'cart',
+      'check',
+      'resend',
       'invalid',
       'empty',
     ]),
@@ -27,6 +29,8 @@ export function parseCommand(text: string): Command {
   if (['0', 'kembali'].includes(input)) return { kind: 'back' };
   if (input === 'batal') return { kind: 'cancel' };
   if (input === 'keranjang') return { kind: 'cart' };
+  if (input === 'cek') return { kind: 'check' };
+  if (input === 'kirim ulang qr') return { kind: 'resend' };
   if (input === 'bantuan') return { kind: 'help' };
   if (/^[1-9]\d{0,9}$/.test(input) && Number(input) <= 2147483647)
     return { kind: 'select', value: Number(input) };

@@ -1,3 +1,4 @@
+import { validateImage } from '../../images.js';
 import makeWASocket, {
   DisconnectReason,
   type WASocket,
@@ -298,6 +299,53 @@ export function createBaileysAdapter(
         );
       // A phone alias authenticated in the inbound envelope remains valid across restart.
       return config.testRecipients.includes(phone ?? senderPhone ?? '');
+    },
+    async sendImage(message, signal): Promise<SendResult> {
+      validateImage(message);
+      const chatId = directJid(message.chatId);
+      if (!chatId || message.caption.length > 1024)
+        throw new MessagingError('invalid_input');
+      if (!adapter.connected() || !socket || signal?.aborted)
+        throw new MessagingError('unavailable');
+      const socketForApproval = socket;
+      if (!(await adapter.approved(chatId, message.recipientPhone)))
+        throw new MessagingError('rejected');
+      if (
+        !adapter.connected() ||
+        socket !== socketForApproval ||
+        signal?.aborted
+      )
+        throw new MessagingError('unavailable');
+      const sock = socket;
+      const deadline = AbortSignal.timeout(5000);
+      const abort = signal ? AbortSignal.any([signal, deadline]) : deadline;
+      let onAbort: () => void = () => {};
+      try {
+        const sent = await Promise.race([
+          sock.sendMessage(chatId, {
+            image: message.image,
+            mimetype: message.mimeType,
+            caption: message.caption,
+          }),
+          new Promise<never>((_resolve, reject) => {
+            onAbort = () => {
+              reject(new MessagingError('uncertain'));
+            };
+            abort.addEventListener('abort', onAbort, { once: true });
+            if (abort.aborted) onAbort();
+          }),
+        ]);
+        return {
+          provider: 'baileys',
+          status: 'accepted',
+          ...(sent?.key.id ? { messageId: sent.key.id } : {}),
+        };
+      } catch {
+        // Once invoked, socket errors/timeouts do not prove the message was rejected.
+        throw new MessagingError('uncertain');
+      } finally {
+        abort.removeEventListener('abort', onAbort);
+      }
     },
     async sendText(message, signal): Promise<SendResult> {
       const chatId = directJid(message.chatId);

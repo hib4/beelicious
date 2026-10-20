@@ -281,3 +281,103 @@ it('resets reconnect budget only after a stable connection and cancels retries o
   await vi.advanceTimersByTimeAsync(120000);
   expect(f.factory).toHaveBeenCalledTimes(3);
 });
+it('sends validated image bytes through the existing linked socket', async () => {
+  const f = setup();
+  await connect(f);
+  const image = Buffer.from('89504e470d0a1a0a00000000', 'hex');
+  await f.adapter.sendImage!({
+    chatId: CHAT,
+    image,
+    mimeType: 'image/png',
+    caption: 'QRIS Sandbox',
+  });
+  expect(f.socket.sendMessage).toHaveBeenCalledWith(CHAT, {
+    image,
+    mimetype: 'image/png',
+    caption: 'QRIS Sandbox',
+  });
+});
+it('delivers Midtrans QR image bytes through Baileys without Facebook Graph requests', async () => {
+  const { createMidtransGateway, fetchQrImage } =
+    await import('../../src/modules/checkout/gateway.js');
+  const { paymentInstructions } =
+    await import('../../src/modules/checkout/messages.js');
+  const { MOCK_IMAGE } =
+    await import('../../src/modules/checkout/notifications.js');
+  const qrUrl = 'https://api.sandbox.midtrans.com/v2/qris/qr-test/qr-code';
+  const transport = vi.fn<typeof fetch>(async (input) => {
+    const url = String(input);
+    if (url === 'https://api.sandbox.midtrans.com/v2/charge')
+      return new Response(
+        JSON.stringify({
+          status_code: '201',
+          order_id: 'test-ref',
+          transaction_id: 'qr-test',
+          merchant_id: 'test-merchant',
+          gross_amount: '40000.00',
+          currency: 'IDR',
+          payment_type: 'qris',
+          transaction_status: 'pending',
+          actions: [{ name: 'generate-qr-code', method: 'GET', url: qrUrl }],
+        }),
+      );
+    if (url === qrUrl)
+      return new Response(new Uint8Array(MOCK_IMAGE), {
+        headers: { 'content-type': 'image/png' },
+      });
+    throw new Error('Unexpected external request');
+  });
+  vi.stubGlobal('fetch', transport);
+  try {
+    const config = {
+      provider: 'midtrans' as const,
+      serverKey: 'SB-test-key',
+      merchantId: 'test-merchant',
+      development: true,
+      expiryMinutes: 15,
+      slotMinutes: 30,
+      capacity: 5,
+      leadMinutes: 60,
+      bookingDays: 7,
+      timezone: 'Asia/Jakarta',
+    };
+    const createdAt = new Date('2026-10-20T05:00:00Z'),
+      expiresAt = new Date('2026-10-20T05:15:00Z');
+    const payment = await createMidtransGateway(config).createPayment({
+      reference: 'test-ref',
+      paymentId: 'test-payment',
+      amount: 40000,
+      createdAt,
+      expiresAt,
+    });
+    const image = await fetchQrImage(payment.qrCodeUrl!);
+    const f = setup();
+    await connect(f);
+    const caption = paymentInstructions(
+      'midtrans',
+      'BEE-TEST',
+      40000,
+      expiresAt,
+      config.timezone,
+    );
+    await f.adapter.sendImage!({
+      chatId: CHAT,
+      image,
+      mimeType: 'image/png',
+      caption,
+    });
+    expect(f.socket.sendMessage).toHaveBeenCalledWith(CHAT, {
+      image: MOCK_IMAGE,
+      mimetype: 'image/png',
+      caption,
+    });
+    expect(transport).toHaveBeenCalledTimes(2);
+    expect(
+      transport.mock.calls.every(([url]) =>
+        String(url).startsWith('https://api.sandbox.midtrans.com/'),
+      ),
+    ).toBe(true);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});

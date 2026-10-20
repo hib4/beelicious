@@ -183,6 +183,15 @@ export class CartService {
     if (!idSchema.safeParse(tenantId).success)
       throw new DomainError('invalid_input');
     return this.run(scope, async (tx, messagingIdentityId) => {
+      if (
+        await tx.order.findFirst({
+          where: {
+            sessionId: scope.sessionId,
+            status: { in: ['PENDING_PAYMENT', 'REQUIRES_REVIEW'] },
+          },
+        })
+      )
+        throw new CartError('ready');
       const existing = await this.load(tx, scope);
       if (existing) {
         if (existing.tenantId !== tenantId) throw new CartError('tenant');
@@ -233,6 +242,15 @@ export class CartService {
   ): Promise<CartResult> {
     return this.run(scope, async (tx) => {
       const action = cartActionSchema.parse(value);
+      if (
+        await tx.order.findFirst({
+          where: {
+            sessionId: scope.sessionId,
+            status: { in: ['PENDING_PAYMENT', 'REQUIRES_REVIEW'] },
+          },
+        })
+      )
+        throw new CartError('ready');
       const cart = await this.load(tx, scope);
       if (!cart) throw new CartError('missing');
       if (

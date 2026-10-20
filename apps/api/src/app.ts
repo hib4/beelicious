@@ -1,3 +1,14 @@
+import {
+  createMidtransGateway,
+  createMockGateway,
+} from './modules/checkout/gateway.js';
+import {
+  PaymentService,
+  registerPaymentWebhook,
+} from './modules/checkout/payments.js';
+import { createCheckoutWorker } from './modules/checkout/notifications.js';
+import { createCloudAdapter } from './modules/messaging/providers/cloud-api.js';
+import type { PaymentGateway } from './modules/checkout/gateway.js';
 import { ConversationEngine } from './modules/conversation/engine.js';
 import { createCatalogServices } from './modules/catalog/services.js';
 import {
@@ -30,6 +41,7 @@ import type { HealthResponse, ReadinessResponse } from '@beelicious/shared';
 import type { Config } from './config.js';
 
 export interface AppDependencies {
+  paymentGateway?: PaymentGateway;
   catalogServices?: CatalogReader;
   whatsappEvents?: WhatsAppEventStore;
   messagingAdapterFactory?: (
@@ -84,6 +96,7 @@ export function buildApp(
           prisma,
           dependencies.now,
           config.CART_MAX_ITEM_QUANTITY,
+          config.checkout,
         )
       : undefined;
   let worker: ReturnType<typeof createWorker> | undefined;
@@ -146,7 +159,44 @@ export function buildApp(
       }
     });
   }
+  const paymentService =
+    config.checkout && prisma
+      ? new PaymentService(
+          prisma,
+          config.checkout,
+          dependencies.paymentGateway ??
+            (config.checkout.provider === 'mock'
+              ? createMockGateway(prisma, dependencies.now)
+              : createMidtransGateway(config.checkout)),
+          dependencies.now,
+        )
+      : undefined;
+  const cloudAdapter =
+    config.checkout && config.whatsapp
+      ? createCloudAdapter(
+          config.whatsapp,
+          dependencies.sender ?? createWhatsAppClient(config.whatsapp),
+        )
+      : undefined;
+  const checkoutWorker =
+    paymentService && config.checkout && prisma
+      ? createCheckoutWorker(
+          prisma,
+          paymentService,
+          config.checkout,
+          () => messaging?.adapter() ?? cloudAdapter,
+          (event) =>
+            app.log.warn({ event }, 'Checkout processing requires attention'),
+          dependencies.now,
+        )
+      : undefined;
+  if (config.checkout && prisma)
+    registerPaymentWebhook(app, prisma, config.checkout);
+  app.addHook('onListen', async () => {
+    checkoutWorker?.start();
+  });
   app.addHook('onClose', async () => {
+    await checkoutWorker?.stop();
     try {
       try {
         await worker?.stop();

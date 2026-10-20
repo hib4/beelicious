@@ -7,6 +7,7 @@ it('queries a real PostgreSQL database and closes its pool', async () => {
     ...process.env,
     NODE_ENV: 'test',
     CONVERSATION_ENABLED: 'false',
+    CHECKOUT_ENABLED: 'false',
     WHATSAPP_ENABLED: 'false',
     WHATSAPP_TEST_BOT_ENABLED: 'false',
   });

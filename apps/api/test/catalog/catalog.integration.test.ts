@@ -36,6 +36,9 @@ afterEach(async () => {
   await client.menuCategory.deleteMany({
     where: { tenantId: { in: [...tenantIds] } },
   });
+  await client.tenantOperatingHour.deleteMany({
+    where: { tenantId: { in: [...tenantIds] } },
+  });
   await client.tenant.deleteMany({ where: { id: { in: [...tenantIds] } } });
   const identityCustomers = await client.customerMessagingIdentity.findMany({
     where: { accountId: { in: [...accountIds] } },
@@ -211,20 +214,18 @@ it('enforces nonnegative prices and restrictive deletion below the service layer
 });
 it('registers a customer once under concurrent requests without orphan records', async () => {
   const input = identity();
-  const before = await client.customer.count();
+  const displayName = `Test-${randomUUID()}`;
   const results = await Promise.all(
-    Array.from({ length: 12 }, () =>
-      customers.register(input, 'Test customer'),
-    ),
+    Array.from({ length: 12 }, () => customers.register(input, displayName)),
   );
   customerIds.add(results[0]!.id);
   expect(new Set(results.map((c) => c.id)).size).toBe(1);
-  expect(await client.customer.count()).toBe(before + 1);
+  expect(await client.customer.count({ where: { displayName } })).toBe(1);
   expect(await customers.findByIdentity(input)).toMatchObject({
     id: results[0]!.id,
   });
   expect(await customers.getById(results[0]!.id)).toMatchObject({
-    displayName: 'Test customer',
+    displayName,
   });
   expect(
     await client.customerMessagingIdentity.count({

@@ -20,6 +20,13 @@ export interface TextMessage {
   recipientPhone?: string;
   text: string;
 }
+export interface ImageMessage {
+  chatId: string;
+  recipientPhone?: string;
+  image: Buffer;
+  mimeType: 'image/png';
+  caption: string;
+}
 export interface SendResult {
   provider: MessagingProvider;
   messageId?: string;
@@ -40,6 +47,7 @@ export interface MessagingAdapter {
   pause(): void;
   stop(): Promise<void>;
   sendText(message: TextMessage, signal?: AbortSignal): Promise<SendResult>;
+  sendImage?(message: ImageMessage, signal?: AbortSignal): Promise<SendResult>;
   approved(chatId: string, senderPhone?: string): Promise<boolean>;
 }
 export interface AdapterCallbacks {

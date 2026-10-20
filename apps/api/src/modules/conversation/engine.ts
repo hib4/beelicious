@@ -1,3 +1,5 @@
+import { checkoutTransition } from './checkout-flow.js';
+import type { CheckoutConfig } from '../checkout/config.js';
 import {
   Prisma,
   isTransactionConflict,
@@ -24,6 +26,7 @@ export class ConversationEngine implements ConversationHandler {
     private readonly db: PrismaClient,
     private readonly now: () => Date = () => new Date(),
     private readonly maxQuantity = 20,
+    private readonly checkout?: CheckoutConfig,
   ) {}
   async handleIncomingMessage(
     eventId: string,
@@ -118,21 +121,71 @@ export class ConversationEngine implements ConversationHandler {
             const context = parsed.success
               ? { ...session, data: parsed.data }
               : idle();
-            const result = await transition(
-              context,
-              input.command,
-              createCatalogServices(tx),
-              {
-                expired:
-                  now.getTime() - session.lastInteractionAt.getTime() >=
-                  30 * 60 * 1000,
-                refresh: session.requiresRefresh || !parsed.success,
-              },
-              {
-                service: new CartService(tx, this.maxQuantity),
-                scope: { customerId: customer.id, sessionId: session.id },
-              },
-            );
+            const checkoutResult = this.checkout
+              ? await checkoutTransition(
+                  context,
+                  input.command,
+                  {
+                    tx,
+                    config: this.checkout,
+                    scope: { customerId: customer.id, sessionId: session.id },
+                    eventId,
+                    now: this.now,
+                    maxQuantity: this.maxQuantity,
+                    chatId:
+                      typeof (claimed.data as { chatId?: unknown }).chatId ===
+                      'string'
+                        ? (claimed.data as { chatId: string }).chatId
+                        : input.senderId,
+                    ...(typeof (claimed.data as { senderPhone?: unknown })
+                      .senderPhone === 'string'
+                      ? {
+                          recipientPhone: (
+                            claimed.data as { senderPhone: string }
+                          ).senderPhone,
+                        }
+                      : {}),
+                  },
+                  session.requiresRefresh || !parsed.success,
+                )
+              : null;
+            const result =
+              checkoutResult ??
+              (await transition(
+                context,
+                input.command,
+                createCatalogServices(tx),
+                {
+                  expired:
+                    now.getTime() - session.lastInteractionAt.getTime() >=
+                    30 * 60 * 1000,
+                  refresh: session.requiresRefresh || !parsed.success,
+                },
+                {
+                  service: new CartService(tx, this.maxQuantity),
+                  scope: { customerId: customer.id, sessionId: session.id },
+                },
+              ));
+            if (
+              this.checkout &&
+              !checkoutResult &&
+              result.context.state === 'CART_READY'
+            )
+              result.text = result.text.replace(
+                'Pickup dan pembayaran tersedia pada tahap berikutnya.\n\n',
+                '',
+              );
+            if (
+              this.checkout &&
+              !checkoutResult &&
+              result.context.state === 'CART_READY'
+            )
+              result.text = result.text.replace(
+                '1. Edit Keranjang',
+                '1. Edit Keranjang\n2. Lanjut Checkout',
+              );
+            if (result.text.length > 4096)
+              throw new Error('Conversation response exceeds limit');
             const { data, ...selection } = result.context;
             const version = session.version + 1;
             // Never spread the persisted session into an update: only writable context.

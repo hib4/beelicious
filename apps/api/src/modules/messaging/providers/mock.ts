@@ -1,3 +1,4 @@
+import { validateImage } from '../images.js';
 import {
   MessagingError,
   phoneSchema,
@@ -14,9 +15,11 @@ export function createMockAdapter(
   callbacks: AdapterCallbacks,
 ) {
   const outgoing: Array<TextMessage & SendResult> = [];
+  const images: Array<{ chatId: string; caption: string; bytes: number }> = [];
   let running = false;
   const adapter: MessagingAdapter & {
     outgoing: typeof outgoing;
+    images: typeof images;
     inject(messages: IncomingMessage[]): Promise<void>;
   } = {
     provider: 'mock',
@@ -35,6 +38,21 @@ export function createMockAdapter(
       return allowed.includes(chatId);
     },
     outgoing,
+    images,
+    async sendImage(message, signal) {
+      validateImage(message);
+      if (!running || signal?.aborted) throw new MessagingError('unavailable');
+      images.push({
+        chatId: message.chatId,
+        caption: message.caption,
+        bytes: message.image.length,
+      });
+      return {
+        provider: 'mock',
+        status: 'recorded',
+        messageId: `mock-image-${images.length}`,
+      };
+    },
     async inject(messages) {
       if (!running) throw new MessagingError('unavailable');
       await callbacks.receive(

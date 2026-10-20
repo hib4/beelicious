@@ -21,6 +21,16 @@ export const stateDataSchema = z.strictObject({
   cartPage: z.number().int().nonnegative().max(2147483647).default(0),
   editItemId: z.uuid().nullable().default(null),
   expectedPrice: z.number().int().nonnegative().nullable().default(null),
+  checkout: z
+    .strictObject({
+      page: z.number().int().nonnegative(),
+      cartId: z.uuid(),
+      revision: z.number().int().nonnegative(),
+      slotId: z.uuid().nullable(),
+      fingerprint: z.string(),
+    })
+    .nullable()
+    .default(null),
   pending: z
     .discriminatedUnion('kind', [
       z.strictObject({
@@ -57,6 +67,7 @@ export const initialData = (): StateData => ({
   editItemId: null,
   expectedPrice: null,
   pending: null,
+  checkout: null,
 });
 export interface Context {
   state: ConversationState;
