@@ -7,3 +7,23 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+// Infrastructure inbox only; no business entities in Phase 2.
+model WhatsAppEvent {
+  id                String   @id @default(uuid())
+  dedupKey          String   @unique
+  kind              String
+  data              Json
+  state             String   @default("pending")
+  attempts          Int      @default(0)
+  availableAt       DateTime @default(now()) @db.Timestamptz(3)
+  leaseToken        String?
+  leaseUntil        DateTime? @db.Timestamptz(3)
+  outboundMessageId String?
+  lastError         String?
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@index([state, availableAt])
+  @@index([state, leaseUntil])
+}

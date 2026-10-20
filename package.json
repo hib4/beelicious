@@ -26,7 +26,10 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "db:generate": "npm run generate -w @beelicious/database",
     "db:migrate": "npm run migrate -w @beelicious/database",
-    "db:migrate:dev": "npm run migrate:dev -w @beelicious/database --"
+    "db:migrate:dev": "npm run migrate:dev -w @beelicious/database --",
+    "db:migrate:test": "node scripts/migrate-test-database.mjs",
+    "whatsapp:send": "node --import ./scripts/load-env.mjs --import tsx apps/api/src/modules/whatsapp/send-cli.ts",
+    "whatsapp:events": "node --import ./scripts/load-env.mjs --import tsx apps/api/src/modules/whatsapp/events-cli.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

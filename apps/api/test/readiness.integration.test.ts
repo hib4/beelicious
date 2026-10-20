@@ -3,7 +3,12 @@ import { buildApp } from '../src/app.js';
 import { parseEnvironment } from '../src/config.js';
 
 it('queries a real PostgreSQL database and closes its pool', async () => {
-  const config = parseEnvironment({ ...process.env, NODE_ENV: 'test' });
+  const config = parseEnvironment({
+    ...process.env,
+    NODE_ENV: 'test',
+    WHATSAPP_ENABLED: 'false',
+    WHATSAPP_TEST_BOT_ENABLED: 'false',
+  });
   const app = buildApp(config);
   try {
     const response = await app.inject('/ready');
