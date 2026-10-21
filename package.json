@@ -39,7 +39,10 @@
     "test:web": "npm run test -w @beelicious/web",
     "test:e2e": "npm run test:e2e -w @beelicious/web",
     "tenant:member": "node --import ./scripts/load-env.mjs --import tsx apps/api/src/modules/dashboard/membership-cli.ts",
-    "test:e2e:dashboard": "npm run test:e2e:dashboard -w @beelicious/web"
+    "test:e2e:dashboard": "npm run test:e2e:dashboard -w @beelicious/web",
+    "build:api": "npm run build:packages && npm run build -w @beelicious/api",
+    "dev:worker": "npm run build:packages && node --import ./scripts/load-env.mjs --import tsx apps/api/src/worker.ts",
+    "start:worker": "node --import ./scripts/load-env.mjs apps/api/dist/worker.js"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

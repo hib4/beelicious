@@ -12,7 +12,12 @@ try {
     throw new Error('Use a separate test database');
   if (!url.pathname.endsWith('_test')) throw new Error('Invalid test database');
   const result = spawnSync('npm', ['run', 'db:migrate'], {
-    env: { ...process.env, DATABASE_URL: url.toString() },
+    env: {
+      ...process.env,
+      DATABASE_URL: url.toString(),
+      // Never inherit the development migration URL when targeting the test DB.
+      DIRECT_DATABASE_URL: url.toString(),
+    },
     stdio: 'inherit',
   });
   process.exitCode = result.status ?? 1;

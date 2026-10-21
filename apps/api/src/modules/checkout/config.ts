@@ -34,21 +34,41 @@ export interface CheckoutConfig {
   bookingDays: number;
   timezone: string;
 }
-export function parseCheckout(
+export type PickupConfig = Pick<
+  CheckoutConfig,
+  'slotMinutes' | 'capacity' | 'leadMinutes' | 'bookingDays' | 'timezone'
+>;
+/** Scheduling is usable by hosted dashboard HTTP without payment credentials. */
+export function parsePickupConfig(
   env: Record<string, string | undefined>,
-): CheckoutConfig | undefined {
-  const parsed = schema.safeParse(env);
-  const invalid = (fields: string[]): never => {
-    throw new Error(`Invalid environment configuration: ${fields.join(', ')}`);
-  };
+): PickupConfig {
+  const parsed = schema
+    .pick({
+      PICKUP_SLOT_MINUTES: true,
+      PICKUP_SLOT_CAPACITY: true,
+      PICKUP_LEAD_MINUTES: true,
+      PICKUP_BOOKING_DAYS: true,
+      PICKUP_TIMEZONE: true,
+    })
+    .safeParse(env);
   if (!parsed.success)
-    return invalid(parsed.error.issues.map((v) => v.path.join('.')));
+    throw new Error(
+      `Invalid environment configuration: ${[...new Set(parsed.error.issues.map((issue) => issue.path.join('.')))].join(', ')}`,
+    );
   const v = parsed.data;
-  if (v.CHECKOUT_ENABLED === 'false') return undefined;
-  if (env.NODE_ENV === 'production' || env.CONVERSATION_ENABLED !== 'true')
-    invalid(['CHECKOUT_ENABLED', 'NODE_ENV', 'CONVERSATION_ENABLED']);
-  if (v.PICKUP_LEAD_MINUTES < v.PAYMENT_EXPIRY_MINUTES + 30)
-    invalid(['PICKUP_LEAD_MINUTES', 'PAYMENT_EXPIRY_MINUTES']);
+  return {
+    slotMinutes: v.PICKUP_SLOT_MINUTES,
+    capacity: v.PICKUP_SLOT_CAPACITY,
+    leadMinutes: v.PICKUP_LEAD_MINUTES,
+    bookingDays: v.PICKUP_BOOKING_DAYS,
+    timezone: v.PICKUP_TIMEZONE,
+  };
+}
+export type PaymentWebhookConfig = Pick<
+  CheckoutConfig,
+  'provider' | 'merchantId' | 'serverKey'
+>;
+function midtransCredentials(env: Record<string, string | undefined>) {
   const credentials = z
     .object({
       MIDTRANS_SERVER_KEY: z.string().startsWith('SB-').min(10),
@@ -64,22 +84,68 @@ export function parseCheckout(
         .optional(),
     })
     .safeParse(env);
-  if (v.PAYMENT_PROVIDER === 'midtrans' && !credentials.success)
-    invalid(credentials.error.issues.map((v) => v.path.join('.')));
+  if (!credentials.success)
+    throw new Error(
+      `Invalid environment configuration: ${[...new Set(credentials.error.issues.map((issue) => issue.path.join('.')))].join(', ')}`,
+    );
+  return credentials.data;
+}
+export function parsePaymentWebhook(
+  env: Record<string, string | undefined>,
+): PaymentWebhookConfig | undefined {
+  if (
+    env.PAYMENT_WEBHOOK_ENABLED !== undefined &&
+    !['true', 'false'].includes(env.PAYMENT_WEBHOOK_ENABLED)
+  )
+    throw new Error(
+      'Invalid environment configuration: PAYMENT_WEBHOOK_ENABLED',
+    );
+  if (env.PAYMENT_WEBHOOK_ENABLED !== 'true') return undefined;
+  if (
+    env.PAYMENT_PROVIDER !== 'midtrans' ||
+    (env.MIDTRANS_ENVIRONMENT ?? 'sandbox') !== 'sandbox'
+  )
+    throw new Error(
+      'Invalid environment configuration: PAYMENT_PROVIDER, MIDTRANS_ENVIRONMENT',
+    );
+  const credentials = midtransCredentials(env);
+  return {
+    provider: 'midtrans',
+    merchantId: credentials.MIDTRANS_MERCHANT_ID,
+    serverKey: credentials.MIDTRANS_SERVER_KEY,
+  };
+}
+export function parseCheckout(
+  env: Record<string, string | undefined>,
+): CheckoutConfig | undefined {
+  const parsed = schema.safeParse(env);
+  const invalid = (fields: string[]): never => {
+    throw new Error(`Invalid environment configuration: ${fields.join(', ')}`);
+  };
+  if (!parsed.success)
+    return invalid(parsed.error.issues.map((v) => v.path.join('.')));
+  const v = parsed.data;
+  if (v.CHECKOUT_ENABLED === 'false') return undefined;
+  if (env.NODE_ENV === 'production' || env.CONVERSATION_ENABLED !== 'true')
+    invalid(['CHECKOUT_ENABLED', 'NODE_ENV', 'CONVERSATION_ENABLED']);
+  if (v.PICKUP_LEAD_MINUTES < v.PAYMENT_EXPIRY_MINUTES + 30)
+    invalid(['PICKUP_LEAD_MINUTES', 'PAYMENT_EXPIRY_MINUTES']);
+  const credentials =
+    v.PAYMENT_PROVIDER === 'midtrans' ? midtransCredentials(env) : undefined;
   return {
     development: env.NODE_ENV === 'development',
     provider: v.PAYMENT_PROVIDER,
     merchantId:
       v.PAYMENT_PROVIDER === 'mock'
         ? 'local-mock'
-        : credentials.success
-          ? credentials.data.MIDTRANS_MERCHANT_ID
+        : credentials
+          ? credentials.MIDTRANS_MERCHANT_ID
           : '',
-    ...(v.PAYMENT_PROVIDER === 'midtrans' && credentials.success
+    ...(v.PAYMENT_PROVIDER === 'midtrans' && credentials
       ? {
-          serverKey: credentials.data.MIDTRANS_SERVER_KEY,
-          ...(credentials.data.PAYMENT_WEBHOOK_URL
-            ? { webhookUrl: credentials.data.PAYMENT_WEBHOOK_URL }
+          serverKey: credentials.MIDTRANS_SERVER_KEY,
+          ...(credentials.PAYMENT_WEBHOOK_URL
+            ? { webhookUrl: credentials.PAYMENT_WEBHOOK_URL }
             : {}),
         }
       : {}),

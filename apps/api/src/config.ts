@@ -4,6 +4,10 @@ import {
 } from './modules/dashboard/config.js';
 import {
   parseCheckout,
+  parsePaymentWebhook,
+  parsePickupConfig,
+  type PickupConfig,
+  type PaymentWebhookConfig,
   type CheckoutConfig,
 } from './modules/checkout/config.js';
 import { z } from 'zod';
@@ -84,6 +88,8 @@ export type Config = Omit<
 > & {
   CART_MAX_ITEM_QUANTITY?: number;
   checkout?: CheckoutConfig;
+  paymentWebhook?: PaymentWebhookConfig;
+  pickup?: PickupConfig;
   dashboard?: DashboardConfig;
   conversationEnabled?: boolean;
   whatsapp?: WhatsAppConfig;
@@ -110,6 +116,7 @@ export function parseEnvironment(
   environment: Record<string, string | undefined>,
 ): Config {
   const checkout = parseCheckout(environment);
+  const paymentWebhook = parsePaymentWebhook(environment);
   const dashboard = parseDashboard(environment);
   const result = environmentSchema.safeParse(environment);
   if (!result.success) {
@@ -136,7 +143,13 @@ export function parseEnvironment(
   if (!flags.data.WHATSAPP_ENABLED) {
     if (flags.data.WHATSAPP_TEST_BOT_ENABLED)
       invalid(['WHATSAPP_TEST_BOT_ENABLED']);
-    return { ...result.data, ...(dashboard ? { dashboard } : {}) };
+    return {
+      ...result.data,
+      ...(dashboard
+        ? { dashboard, pickup: parsePickupConfig(environment) }
+        : {}),
+      ...(paymentWebhook ? { paymentWebhook } : {}),
+    };
   }
   const provider = flags.data.MESSAGING_PROVIDER;
   if (provider !== 'cloud-api') {
@@ -158,8 +171,11 @@ export function parseEnvironment(
       invalid(['BAILEYS_AUTH_DIR']);
     return {
       ...result.data,
-      ...(dashboard ? { dashboard } : {}),
+      ...(dashboard
+        ? { dashboard, pickup: parsePickupConfig(environment) }
+        : {}),
       ...(checkout ? { checkout } : {}),
+      ...(paymentWebhook ? { paymentWebhook } : {}),
       conversationEnabled: flags.data.CONVERSATION_ENABLED,
       messaging: {
         provider,
@@ -186,8 +202,9 @@ export function parseEnvironment(
   }
   return {
     ...result.data,
-    ...(dashboard ? { dashboard } : {}),
+    ...(dashboard ? { dashboard, pickup: parsePickupConfig(environment) } : {}),
     ...(checkout ? { checkout } : {}),
+    ...(paymentWebhook ? { paymentWebhook } : {}),
     conversationEnabled: flags.data.CONVERSATION_ENABLED,
     messaging: {
       provider,
@@ -205,4 +222,21 @@ export function parseEnvironment(
       testRecipients: values.WHATSAPP_TEST_RECIPIENTS,
     },
   };
+}
+
+/** Vercel runs HTTP only. Reject mistakes before allocating a database or adapter. */
+export function parseHttpEnvironment(
+  environment: Record<string, string | undefined>,
+): Config {
+  const forbidden = [
+    'WHATSAPP_ENABLED',
+    'WHATSAPP_TEST_BOT_ENABLED',
+    'CONVERSATION_ENABLED',
+    'CHECKOUT_ENABLED',
+  ].filter(
+    (field) =>
+      environment[field] !== undefined && environment[field] !== 'false',
+  );
+  if (forbidden.length) invalid(forbidden);
+  return parseEnvironment(environment);
 }

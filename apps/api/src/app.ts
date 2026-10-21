@@ -4,34 +4,17 @@ import {
   createIdentityVerifier,
   type IdentityVerifier,
 } from './modules/dashboard/config.js';
-import {
-  createMidtransGateway,
-  createMockGateway,
-} from './modules/checkout/gateway.js';
-import {
-  PaymentService,
-  registerPaymentWebhook,
-} from './modules/checkout/payments.js';
-import { createCheckoutWorker } from './modules/checkout/notifications.js';
-import { createCloudAdapter } from './modules/messaging/providers/cloud-api.js';
+import { registerPaymentWebhook } from './modules/checkout/payments.js';
+import { createBackgroundRuntime } from './runtime.js';
 import type { PaymentGateway } from './modules/checkout/gateway.js';
-import { ConversationEngine } from './modules/conversation/engine.js';
 import { createCatalogServices } from './modules/catalog/services.js';
 import {
   registerCatalogRoutes,
   type CatalogReader,
 } from './modules/catalog/routes.js';
 import Fastify, { type FastifyServerOptions } from 'fastify';
-import {
-  createWhatsAppClient,
-  type TextSender,
-} from './modules/whatsapp/client.js';
+import type { TextSender } from './modules/whatsapp/client.js';
 import { registerWhatsAppRoutes } from './modules/whatsapp/routes.js';
-import { createWorker } from './modules/whatsapp/worker.js';
-import {
-  createMessagingRuntime,
-  type MessagingRuntime,
-} from './modules/messaging/runtime.js';
 import type {
   AdapterCallbacks,
   MessagingAdapter,
@@ -47,6 +30,8 @@ import type { HealthResponse, ReadinessResponse } from '@beelicious/shared';
 import type { Config } from './config.js';
 
 export interface AppDependencies {
+  /** Entrypoints choose whether listening starts persistent background work. */
+  background?: boolean;
   identityVerifier?: IdentityVerifier;
   paymentGateway?: PaymentGateway;
   catalogServices?: CatalogReader;
@@ -96,7 +81,11 @@ export function buildApp(
       async (scope) =>
         registerDashboardRoutes(
           scope,
-          new DashboardService(prisma, dependencies.now, config.checkout),
+          new DashboardService(
+            prisma,
+            dependencies.now,
+            config.pickup ?? config.checkout,
+          ),
           dependencies.identityVerifier ??
             createIdentityVerifier(config.dashboard!),
         ),
@@ -107,121 +96,42 @@ export function buildApp(
     dependencies.catalogServices ??
     (prisma ? createCatalogServices(prisma) : undefined);
   app.register(async (scope) => registerCatalogRoutes(scope, catalog));
-  if (config.conversationEnabled && !prisma)
-    throw new Error('Conversation persistence is required');
-  const conversation =
-    config.conversationEnabled && prisma
-      ? new ConversationEngine(
-          prisma,
-          dependencies.now,
-          config.CART_MAX_ITEM_QUANTITY,
-          config.checkout,
-        )
-      : undefined;
-  let worker: ReturnType<typeof createWorker> | undefined;
-  let messaging: MessagingRuntime | undefined;
   if (config.whatsapp) {
     const store =
       dependencies.whatsappEvents ??
       (database as Partial<WhatsAppDatabase>).whatsappEvents;
     if (!store) throw new Error('WhatsApp event storage is required');
-    const whatsapp = config.whatsapp;
     app.register(async (scope) => {
-      await registerWhatsAppRoutes(scope, whatsapp, store, !!conversation);
-    });
-    worker = createWorker(
-      store,
-      dependencies.sender ?? createWhatsAppClient(whatsapp),
-      whatsapp,
-      config.NODE_ENV === 'development',
-      (event) => {
-        app.log.warn({ event }, 'WhatsApp processing requires attention');
-      },
-      dependencies.now,
-      conversation,
-    );
-    app.addHook('onListen', async () => {
-      worker?.start();
+      await registerWhatsAppRoutes(
+        scope,
+        config.whatsapp!,
+        store,
+        !!config.conversationEnabled,
+      );
     });
   }
-  if (config.messaging && config.messaging.provider !== 'cloud-api') {
-    const store =
-      dependencies.whatsappEvents ??
-      (database as Partial<WhatsAppDatabase>).whatsappEvents;
-    if (!store) throw new Error('Messaging event storage is required');
-    messaging = createMessagingRuntime(
-      config.messaging,
-      store,
-      config.NODE_ENV === 'development',
-      (event) => {
-        app.log.info({ event }, 'Messaging provider event');
-      },
-      {
-        ...(conversation ? { conversation } : {}),
-        ...(dependencies.messagingAdapterFactory
-          ? { adapterFactory: dependencies.messagingAdapterFactory }
-          : {}),
-        ...(dependencies.qr ? { qr: dependencies.qr } : {}),
-        ...(dependencies.now ? { now: dependencies.now } : {}),
-      },
-    );
-    app.addHook('onListen', async () => {
-      // Fastify reports onListen failures without failing listen; clean up explicitly.
-      try {
-        await messaging?.start();
-      } catch {
-        app.log.error(
-          { event: 'messaging_start_failed' },
-          'Messaging provider could not start',
-        );
-        await messaging?.stop();
-      }
-    });
-  }
-  const paymentService =
-    config.checkout && prisma
-      ? new PaymentService(
-          prisma,
-          config.checkout,
-          dependencies.paymentGateway ??
-            (config.checkout.provider === 'mock'
-              ? createMockGateway(prisma, dependencies.now)
-              : createMidtransGateway(config.checkout)),
-          dependencies.now,
-        )
-      : undefined;
-  const cloudAdapter =
-    (config.checkout || config.dashboard) && config.whatsapp
-      ? createCloudAdapter(
-          config.whatsapp,
-          dependencies.sender ?? createWhatsAppClient(config.whatsapp),
-        )
-      : undefined;
-  const checkoutWorker =
-    (paymentService || config.dashboard) && prisma
-      ? createCheckoutWorker(
-          prisma,
-          paymentService,
-          config.checkout,
-          () => messaging?.adapter() ?? cloudAdapter,
-          (event) =>
-            app.log.warn({ event }, 'Checkout processing requires attention'),
-          dependencies.now,
-        )
-      : undefined;
-  if (config.checkout && prisma)
-    registerPaymentWebhook(app, prisma, config.checkout);
+  const webhook = config.paymentWebhook ?? config.checkout;
+  if (webhook && prisma) registerPaymentWebhook(app, prisma, webhook);
+  const runtime =
+    dependencies.background === false
+      ? undefined
+      : createBackgroundRuntime(config, database, dependencies, (event) => {
+          app.log.warn({ event }, 'Background processing requires attention');
+        });
   app.addHook('onListen', async () => {
-    checkoutWorker?.start();
+    try {
+      await runtime?.start();
+    } catch {
+      app.log.error(
+        { event: 'messaging_start_failed' },
+        'Messaging provider could not start',
+      );
+      await runtime?.stop();
+    }
   });
   app.addHook('onClose', async () => {
-    await checkoutWorker?.stop();
     try {
-      try {
-        await worker?.stop();
-      } finally {
-        await messaging?.stop();
-      }
+      await runtime?.stop();
     } finally {
       await database.disconnect();
     }

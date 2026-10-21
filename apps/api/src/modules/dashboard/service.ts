@@ -1,4 +1,4 @@
-import type { CheckoutConfig } from '../checkout/config.js';
+import type { PickupConfig } from '../checkout/config.js';
 import {
   Prisma,
   isTransactionConflict,
@@ -72,11 +72,7 @@ export class DashboardService {
   constructor(
     private db: PrismaClient,
     private now = () => new Date(),
-    private pickupConfig: CheckoutConfig = {
-      development: true,
-      provider: 'mock',
-      merchantId: 'mock',
-      expiryMinutes: 15,
+    private pickupConfig: PickupConfig = {
       slotMinutes: 30,
       capacity: 5,
       leadMinutes: 60,

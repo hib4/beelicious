@@ -53,6 +53,18 @@ The editorial page follows [DESIGN.md](DESIGN.md): oversized type, the original 
 
 Deploy the web workspace independently with `npm run build:web` and `npm run start:web` (or the equivalent Next.js platform adapter). Configure public values in the build environment; do not copy the backend `.env` or auth directory. Public launch requires verified service readiness, content, contact approval policy, and a deliberate indexing review.
 
+## Hosting the API
+
+The frontend and Fastify API can use separate Vercel projects. The API handles HTTP; Baileys and durable background processing run manually on your computer against the same hosted Supabase PostgreSQL database.
+
+```bash
+npm run dev:worker # Local Baileys, conversations, payments and notifications; no HTTP port
+# Compiled alternative after npm run build:api:
+npm run start:worker
+```
+
+Do not run the full local API and dedicated worker together against the same Baileys auth directory. While the worker is stopped, the dashboard remains available and webhook events persist, but payment processing and WhatsApp delivery wait. See [Vercel API deployment](docs/vercel-api.md) for environment settings, database setup and verification. No local data is reset or copied automatically.
+
 ## Tenant dashboard
 
 Private routes start at `/login` and `/dashboard`. Supabase email/password authentication and database memberships restrict OWNER/STAFF access; public signup is disabled. The dashboard reads real orders, advances paid fulfillment, manages menus and protects pickup reservations. It remains off until `DASHBOARD_ENABLED=true` is configured separately for API and web.

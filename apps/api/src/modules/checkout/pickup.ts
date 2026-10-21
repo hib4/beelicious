@@ -4,7 +4,7 @@ import {
   type PickupReservation,
 } from '@beelicious/database';
 import { DomainError } from '../catalog/validation.js';
-import type { CheckoutConfig } from './config.js';
+import type { PickupConfig } from './config.js';
 export type Tx = Prisma.TransactionClient;
 export function localParts(date: Date, timezone: string) {
   const p = new Intl.DateTimeFormat('en-CA', {
@@ -77,7 +77,7 @@ export function pickupLabel(date: Date, timezone = 'Asia/Jakarta') {
 export class PickupSlotService {
   constructor(
     private db: PrismaClient | Tx,
-    private config: CheckoutConfig,
+    private config: PickupConfig,
     private now = () => new Date(),
     private transactionBound = false,
   ) {}

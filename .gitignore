@@ -24,3 +24,6 @@ packages/database/src/generated/
 
 # Local design audit captures
 .taste-skill/
+
+# Local Vercel project links and downloaded deployment environment.
+.vercel/

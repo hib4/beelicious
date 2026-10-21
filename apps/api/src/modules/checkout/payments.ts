@@ -14,7 +14,11 @@ import {
   type CheckoutOrder,
   orderInclude,
 } from './orders.js';
-import { matchesGateway, type CheckoutConfig } from './config.js';
+import {
+  matchesGateway,
+  type CheckoutConfig,
+  type PaymentWebhookConfig,
+} from './config.js';
 import {
   GatewayError,
   verifySignature,
@@ -478,7 +482,7 @@ const notificationSchema = z.object({
 export function registerPaymentWebhook(
   app: FastifyInstance,
   db: PrismaClient,
-  config: CheckoutConfig,
+  config: PaymentWebhookConfig,
 ) {
   if (config.provider !== 'midtrans') return;
   app.post(

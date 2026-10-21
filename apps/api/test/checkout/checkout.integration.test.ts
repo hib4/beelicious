@@ -1,3 +1,5 @@
+import { buildApp } from '../../src/app.js';
+import { parseHttpEnvironment } from '../../src/config.js';
 import { ConversationEngine } from '../../src/modules/conversation/engine.js';
 import { parseCommand } from '../../src/modules/conversation/commands.js';
 import { randomUUID, createHash } from 'node:crypto';
@@ -655,47 +657,49 @@ it('drives pickup/confirmation/awaiting states and safe CEK/BATAL through transa
     true,
   );
 });
-it('webhook rejects invalid signatures and durably deduplicates valid notifications before authenticated reconciliation', async () => {
-  const base = await fixture();
-  const c = {
-    ...config,
-    provider: 'midtrans' as const,
-    merchantId: 'M-test',
-    serverKey: 'SB-secret',
-  };
-  const f = {
-    ...base,
-    order: await new OrderService(p, c, now).createFromCart(
-      base.scope,
-      base.input,
-    ),
-  };
-  const app = Fastify();
-  registerPaymentWebhook(app, p, c);
-  const v = {
-    order_id: f.order.payment!.providerOrderId,
-    status_code: '200',
-    gross_amount: '40000.00',
-    transaction_id: 'tx',
-    merchant_id: 'M-test',
-    payment_type: 'qris',
-    transaction_status: 'settlement',
-    currency: 'IDR',
-    signature_key: '',
-  };
-  expect(
-    (
-      await app.inject({
-        method: 'POST',
-        url: '/webhooks/midtrans',
-        payload: v,
-      })
-    ).statusCode,
-  ).toBe(401);
-  v.signature_key = createHash('sha512')
-    .update(v.order_id + v.status_code + v.gross_amount + 'SB-secret')
-    .digest('hex');
-  for (let i = 0; i < 2; i++)
+it.each([false, true])(
+  'webhook rejects invalid signatures and durably deduplicates before local reconciliation (hosted HTTP: %s)',
+  async (hosted) => {
+    const base = await fixture();
+    const c = {
+      ...config,
+      provider: 'midtrans' as const,
+      merchantId: 'M-test',
+      serverKey: 'SB-secret',
+    };
+    const f = {
+      ...base,
+      order: await new OrderService(p, c, now).createFromCart(
+        base.scope,
+        base.input,
+      ),
+    };
+    const app = hosted
+      ? buildApp(
+          parseHttpEnvironment({
+            NODE_ENV: 'production',
+            DATABASE_URL: url.toString(),
+            PAYMENT_WEBHOOK_ENABLED: 'true',
+            PAYMENT_PROVIDER: 'midtrans',
+            MIDTRANS_SERVER_KEY: 'SB-secret-fixture',
+            MIDTRANS_MERCHANT_ID: c.merchantId,
+          }),
+          { ...db, disconnect: async () => {} },
+          { background: false },
+        )
+      : Fastify();
+    if (!hosted) registerPaymentWebhook(app, p, c);
+    const v = {
+      order_id: f.order.payment!.providerOrderId,
+      status_code: '200',
+      gross_amount: '40000.00',
+      transaction_id: 'tx',
+      merchant_id: 'M-test',
+      payment_type: 'qris',
+      transaction_status: 'settlement',
+      currency: 'IDR',
+      signature_key: '',
+    };
     expect(
       (
         await app.inject({
@@ -704,19 +708,72 @@ it('webhook rejects invalid signatures and durably deduplicates valid notificati
           payload: v,
         })
       ).statusCode,
-    ).toBe(200);
-  expect(
-    await p.paymentEvent.count({
-      where: {
-        paymentId: f.order.payment!.id,
-        provider: 'midtrans',
-        processingStatus: 'pending',
-      },
-    }),
-  ).toBe(1);
-  expect((await f.orders.current(f.scope))?.status).toBe('PENDING_PAYMENT');
-  await app.close();
-});
+    ).toBe(401);
+    v.signature_key = createHash('sha512')
+      .update(
+        v.order_id +
+          v.status_code +
+          v.gross_amount +
+          (hosted ? 'SB-secret-fixture' : 'SB-secret'),
+      )
+      .digest('hex');
+    for (let i = 0; i < 2; i++)
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url: '/webhooks/midtrans',
+            payload: v,
+          })
+        ).statusCode,
+      ).toBe(200);
+    expect(
+      await p.paymentEvent.count({
+        where: {
+          paymentId: f.order.payment!.id,
+          provider: 'midtrans',
+          processingStatus: 'pending',
+        },
+      }),
+    ).toBe(1);
+    expect((await f.orders.current(f.scope))?.status).toBe('PENDING_PAYMENT');
+    await app.close();
+    // A separate local process later consumes the durable evidence through authenticated status retrieval.
+    await p.payment.update({
+      where: { id: f.order.payment!.id },
+      data: { creationStarted: true, availableAt: now() },
+    });
+    const transport = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({
+        status_code: '200',
+        order_id: v.order_id,
+        transaction_id: v.transaction_id,
+        merchant_id: v.merchant_id,
+        gross_amount: v.gross_amount,
+        currency: 'IDR',
+        transaction_status: 'settlement',
+        payment_type: 'qris',
+      }),
+    );
+    await new PaymentService(
+      p,
+      c,
+      createMidtransGateway(c, transport),
+      now,
+    ).tick();
+    expect((await f.orders.current(f.scope))?.payment?.status).toBe(
+      'SUCCEEDED',
+    );
+    expect((await f.orders.current(f.scope))?.reservation?.status).toBe(
+      'CONFIRMED',
+    );
+    expect(
+      await p.checkoutNotification.count({
+        where: { logicalKey: `settlement:${f.order.id}` },
+      }),
+    ).toBe(1);
+  },
+);
 
 it('atomically deduplicates checkout through the persisted ConversationEngine across restarts', async () => {
   const f = await fixture();
