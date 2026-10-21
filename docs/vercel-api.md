@@ -52,9 +52,11 @@ Import the same Git repository as a **new** Vercel project, suggested name `beel
 | Node.js                              | 24.x                                                |
 | Install                              | `cd ../.. && npm ci --include=dev --ignore-scripts` |
 | Build                                | `cd ../.. && npm run build:api`                     |
-| Output directory                     | Unset                                               |
+| Output directory                     | `public`                                            |
 
 `apps/api/vercel.json` contains these commands and routes all paths to `api/index.ts`, a conventional Node function. It dispatches the original URL to Fastify after readiness. This intentionally avoids Fastify auto-detection selecting the existing `src/app.ts` factory or starting the long-lived server entrypoint. The API build generates Prisma and compiles workspace packages without building Next.js, migrating, or seeding.
+
+Vercel also validates static output when a custom build command is present. The tracked `apps/api/public/.gitkeep` preserves its required `public` directory; it contains no application assets. Keep this directory and set Output Directory to `public` if overriding project settings. The catch-all rewrite still routes requests to the Node function. Never use `.` or `dist` as the static output directory: application source and compiled server code must not become public assets.
 
 Keep `NODE_ENV=production`. The install command explicitly includes development dependencies because compilation needs TypeScript, Prisma CLI and type declarations, including `@types/proper-lockfile` and `@types/qrcode-terminal`. If Vercel has an Install Command override, update it to match. After changing this command, redeploy without the existing build cache. Compiling Baileys sources does not start the local messaging worker.
 
