@@ -1,3 +1,9 @@
+import { DashboardService } from './modules/dashboard/service.js';
+import { registerDashboardRoutes } from './modules/dashboard/routes.js';
+import {
+  createIdentityVerifier,
+  type IdentityVerifier,
+} from './modules/dashboard/config.js';
 import {
   createMidtransGateway,
   createMockGateway,
@@ -41,6 +47,7 @@ import type { HealthResponse, ReadinessResponse } from '@beelicious/shared';
 import type { Config } from './config.js';
 
 export interface AppDependencies {
+  identityVerifier?: IdentityVerifier;
   paymentGateway?: PaymentGateway;
   catalogServices?: CatalogReader;
   whatsappEvents?: WhatsAppEventStore;
@@ -84,6 +91,18 @@ export function buildApp(
           },
   });
   const prisma = (database as Partial<ApplicationDatabase>).prisma;
+  if (config.dashboard && prisma) {
+    app.register(
+      async (scope) =>
+        registerDashboardRoutes(
+          scope,
+          new DashboardService(prisma, dependencies.now, config.checkout),
+          dependencies.identityVerifier ??
+            createIdentityVerifier(config.dashboard!),
+        ),
+      { prefix: '/api/v1/tenant-dashboard' },
+    );
+  }
   const catalog =
     dependencies.catalogServices ??
     (prisma ? createCatalogServices(prisma) : undefined);
@@ -172,14 +191,14 @@ export function buildApp(
         )
       : undefined;
   const cloudAdapter =
-    config.checkout && config.whatsapp
+    (config.checkout || config.dashboard) && config.whatsapp
       ? createCloudAdapter(
           config.whatsapp,
           dependencies.sender ?? createWhatsAppClient(config.whatsapp),
         )
       : undefined;
   const checkoutWorker =
-    paymentService && config.checkout && prisma
+    (paymentService || config.dashboard) && prisma
       ? createCheckoutWorker(
           prisma,
           paymentService,

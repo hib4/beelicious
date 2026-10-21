@@ -453,7 +453,7 @@ svg {
   align-items: center;
 }
 .journey-narrative .chapter-copy {
-  min-height: 300px;
+  min-height: 180px;
 }
 .journey-controls {
   display: flex;

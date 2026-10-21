@@ -1,4 +1,8 @@
 import {
+  parseDashboard,
+  type DashboardConfig,
+} from './modules/dashboard/config.js';
+import {
   parseCheckout,
   type CheckoutConfig,
 } from './modules/checkout/config.js';
@@ -80,6 +84,7 @@ export type Config = Omit<
 > & {
   CART_MAX_ITEM_QUANTITY?: number;
   checkout?: CheckoutConfig;
+  dashboard?: DashboardConfig;
   conversationEnabled?: boolean;
   whatsapp?: WhatsAppConfig;
   messaging?: MessagingConfig;
@@ -105,6 +110,7 @@ export function parseEnvironment(
   environment: Record<string, string | undefined>,
 ): Config {
   const checkout = parseCheckout(environment);
+  const dashboard = parseDashboard(environment);
   const result = environmentSchema.safeParse(environment);
   if (!result.success) {
     const fields = [
@@ -130,7 +136,7 @@ export function parseEnvironment(
   if (!flags.data.WHATSAPP_ENABLED) {
     if (flags.data.WHATSAPP_TEST_BOT_ENABLED)
       invalid(['WHATSAPP_TEST_BOT_ENABLED']);
-    return result.data;
+    return { ...result.data, ...(dashboard ? { dashboard } : {}) };
   }
   const provider = flags.data.MESSAGING_PROVIDER;
   if (provider !== 'cloud-api') {
@@ -152,6 +158,7 @@ export function parseEnvironment(
       invalid(['BAILEYS_AUTH_DIR']);
     return {
       ...result.data,
+      ...(dashboard ? { dashboard } : {}),
       ...(checkout ? { checkout } : {}),
       conversationEnabled: flags.data.CONVERSATION_ENABLED,
       messaging: {
@@ -179,6 +186,7 @@ export function parseEnvironment(
   }
   return {
     ...result.data,
+    ...(dashboard ? { dashboard } : {}),
     ...(checkout ? { checkout } : {}),
     conversationEnabled: flags.data.CONVERSATION_ENABLED,
     messaging: {

@@ -13,8 +13,8 @@ export const MOCK_IMAGE = Buffer.from(
 );
 export function createCheckoutWorker(
   db: PrismaClient,
-  payments: PaymentService,
-  config: CheckoutConfig,
+  payments: PaymentService | undefined,
+  config: CheckoutConfig | undefined,
   getAdapter: () => MessagingAdapter | undefined,
   warn: (event: string) => void,
   now = () => new Date(),
@@ -46,7 +46,7 @@ export function createCheckoutWorker(
     const row = await db.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<
         { id: string }[]
-      >`SELECT n."id" FROM "CheckoutNotification" n JOIN "Order" o ON o."id" = n."orderId" JOIN "CustomerMessagingIdentity" i ON i."id" = o."messagingIdentityId" JOIN "Payment" payment ON payment."orderId" = o."id" WHERE payment."provider" = ${config.provider} AND payment."merchantId" = ${config.merchantId} AND i."provider" = ${adapter.provider} AND i."accountId" = ${adapter.accountId()!} AND n."availableAt" <= ${time} AND NOT EXISTS (SELECT 1 FROM "WhatsAppEvent" inbox WHERE inbox."id" = o."confirmationEventId" AND inbox."state" IN ('pending','processing','sending')) AND (n."state" = 'pending' OR (n."state" = 'processing' AND n."leaseUntil" < ${time})) AND NOT EXISTS (SELECT 1 FROM "CheckoutNotification" earlier JOIN "Order" eo ON eo."id" = earlier."orderId" WHERE eo."sessionId" = o."sessionId" AND earlier."createdAt" < n."createdAt" AND earlier."state" IN ('pending','processing','sending')) ORDER BY n."createdAt", n."id" FOR UPDATE OF n SKIP LOCKED LIMIT 1`;
+      >`SELECT n."id" FROM "CheckoutNotification" n JOIN "Order" o ON o."id" = n."orderId" JOIN "CustomerMessagingIdentity" i ON i."id" = o."messagingIdentityId" JOIN "Payment" payment ON payment."orderId" = o."id" WHERE (n."kind" = 'fulfillment' OR (payment."provider" = ${config?.provider ?? 'disabled'} AND payment."merchantId" = ${config?.merchantId ?? 'disabled'})) AND i."provider" = ${adapter.provider} AND i."accountId" = ${adapter.accountId()!} AND n."availableAt" <= ${time} AND NOT EXISTS (SELECT 1 FROM "WhatsAppEvent" inbox WHERE inbox."id" = o."confirmationEventId" AND inbox."state" IN ('pending','processing','sending')) AND (n."state" = 'pending' OR (n."state" = 'processing' AND n."leaseUntil" < ${time})) AND NOT EXISTS (SELECT 1 FROM "CheckoutNotification" earlier JOIN "Order" eo ON eo."id" = earlier."orderId" WHERE eo."sessionId" = o."sessionId" AND earlier."createdAt" < n."createdAt" AND earlier."state" IN ('pending','processing','sending') AND (n."kind" <> 'fulfillment' OR earlier."kind" = 'fulfillment' OR EXISTS (SELECT 1 FROM "Payment" ep WHERE ep."orderId" = eo."id" AND ep."provider" = ${config?.provider ?? 'disabled'} AND ep."merchantId" = ${config?.merchantId ?? 'disabled'}))) ORDER BY n."createdAt", n."id" FOR UPDATE OF n SKIP LOCKED LIMIT 1`;
       if (!rows[0]) return null;
       return tx.checkoutNotification.update({
         where: { id: rows[0].id },
@@ -91,9 +91,9 @@ export function createCheckoutWorker(
     }
     let image: Buffer | undefined;
     try {
-      if (row.kind === 'qr')
+      if (row.kind === 'qr' && config)
         image =
-          config.provider === 'mock'
+          config?.provider === 'mock'
             ? MOCK_IMAGE
             : row.order.payment?.qrCodeUrl
               ? await imageLoader(row.order.payment.qrCodeUrl)
@@ -159,7 +159,7 @@ export function createCheckoutWorker(
               mimeType: 'image/png',
               caption: paymentQrCaption(
                 row.text,
-                config,
+                config!,
                 row.order.payment?.qrCodeUrl,
               ),
             },
@@ -202,7 +202,7 @@ export function createCheckoutWorker(
   }
   async function run() {
     try {
-      await payments.tick();
+      await payments?.tick();
       await deliver();
     } catch {
       warn('checkout_worker_failed');

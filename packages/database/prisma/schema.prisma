@@ -43,6 +43,8 @@ model Tenant {
   isActive       Boolean               @default(true)
   createdAt      DateTime              @default(now()) @db.Timestamptz(3)
   updatedAt      DateTime              @default(now()) @updatedAt @db.Timestamptz(3)
+  users          TenantUser[]
+  audits         TenantAudit[]
   operatingHours TenantOperatingHour[]
   pickupSlots    PickupSlot[]
   orders         Order[]
@@ -312,6 +314,9 @@ model Order {
   confirmationEventId String                    @unique
   pickupSlotId        String                    @db.Uuid
   pickupSlot          PickupSlot                @relation(fields: [pickupSlotId, tenantId], references: [id, tenantId], onDelete: Restrict, onUpdate: Restrict)
+  fulfillmentStatus   FulfillmentStatus?
+  fulfillmentVersion  Int                       @default(0)
+  fulfillmentHistory  FulfillmentHistory[]
   status              OrderStatus               @default(PENDING_PAYMENT)
   subtotal            Int
   totalAmount         Int
@@ -328,6 +333,8 @@ model Order {
   @@unique([id, tenantId])
   @@unique([sourceCartId, tenantId])
   @@unique([id, tenantId, pickupSlotId])
+  @@index([tenantId, fulfillmentStatus, placedAt, id])
+  @@index([tenantId, placedAt, id])
   @@index([sessionId, placedAt])
 }
 
@@ -434,4 +441,65 @@ model CheckoutNotification {
   updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
 
   @@index([state, availableAt])
+}
+
+
+enum TenantRole {
+  OWNER
+  STAFF
+}
+
+enum FulfillmentStatus {
+  NEW
+  ACCEPTED
+  PREPARING
+  READY_FOR_PICKUP
+  COMPLETED
+  REQUIRES_REVIEW
+}
+
+model TenantUser {
+  id                    String @id @default(uuid()) @db.Uuid
+  tenantId              String @db.Uuid
+  tenant                Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  authUserId            String @db.Uuid
+  role                  TenantRole
+  isActive              Boolean @default(true)
+  canManageAvailability Boolean @default(false)
+  createdAt             DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([tenantId, authUserId])
+  @@index([authUserId, isActive])
+}
+
+model FulfillmentHistory {
+  id            String @id @default(uuid()) @db.Uuid
+  tenantId      String @db.Uuid
+  orderId       String @db.Uuid
+  order         Order @relation(fields: [orderId, tenantId], references: [id, tenantId], onDelete: Restrict, onUpdate: Restrict)
+  actorUserId   String @db.Uuid
+  fromStatus    FulfillmentStatus
+  toStatus      FulfillmentStatus
+  version       Int
+  requestId     String @db.Uuid
+  reason        String? @db.VarChar(500)
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([tenantId, requestId])
+  @@unique([orderId, version])
+  @@index([orderId, createdAt])
+}
+
+model TenantAudit {
+  id          String @id @default(uuid()) @db.Uuid
+  tenantId    String @db.Uuid
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  actorUserId String @db.Uuid
+  action      String @db.VarChar(60)
+  targetId    String @db.Uuid
+  changes     Json
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([tenantId, createdAt, id])
 }

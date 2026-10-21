@@ -167,7 +167,7 @@ export class OrderService {
       const totals = calculateCartPricing(cart.items);
       if (totals.subtotal <= 0 || totals.subtotal > 2147483647)
         throw new DomainError('invalid_input');
-      const pickup = new PickupSlotService(tx, this.config, this.now);
+      const pickup = new PickupSlotService(tx, this.config, this.now, true);
       await pickup.validateSlot(tx, cart.tenantId, input.slotId, true);
       const now = this.now();
       const expiresAt = new Date(

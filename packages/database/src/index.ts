@@ -91,3 +91,11 @@ export type {
   PaymentStatus,
   OrderStatus,
 } from './generated/prisma/client.js';
+
+export type {
+  FulfillmentStatus,
+  TenantRole,
+  TenantUser,
+  FulfillmentHistory,
+  TenantAudit,
+} from './generated/prisma/client.js';

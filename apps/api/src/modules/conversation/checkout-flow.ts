@@ -279,7 +279,7 @@ export async function checkoutTransition(
       };
     c.data.checkout = null;
   }
-  const slotsService = new PickupSlotService(d.tx, d.config, d.now);
+  const slotsService = new PickupSlotService(d.tx, d.config, d.now, true);
   const confirmation = async (slotId: string) => {
     const slot = await d.tx.pickupSlot.findFirst({
       where: { id: slotId, tenantId: cart.tenantId },

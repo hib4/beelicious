@@ -79,6 +79,7 @@ export class PickupSlotService {
     private db: PrismaClient | Tx,
     private config: CheckoutConfig,
     private now = () => new Date(),
+    private transactionBound = false,
   ) {}
   getOperatingHours(tenantId: string) {
     return this.db.tenantOperatingHour.findMany({
@@ -86,8 +87,19 @@ export class PickupSlotService {
       orderBy: { dayOfWeek: 'asc' },
     });
   }
-  async generateSlots(tenantId: string) {
-    const tenant = await this.db.tenant.findFirst({
+  async generateSlots(tenantId: string): Promise<void> {
+    if (!this.transactionBound && '$transaction' in this.db) {
+      await this.db.$transaction((tx) =>
+        new PickupSlotService(tx, this.config, this.now, true).generateSlots(
+          tenantId,
+        ),
+      );
+      return;
+    }
+    const db = this.db as Tx;
+    await db.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`schedule:${tenantId}`},0))`;
+
+    const tenant = await db.tenant.findFirst({
       where: { id: tenantId, isActive: true },
     });
     if (!tenant) throw new DomainError('not_found');
@@ -150,13 +162,26 @@ export class PickupSlotService {
         });
       }
     }
-    await this.db.pickupSlot.createMany({
-      data: generated,
+    const existing = await db.pickupSlot.findMany({
+      where: { tenantId, isAvailable: true, endsAt: { gt: now } },
+      select: { startsAt: true, endsAt: true },
+    });
+    await db.pickupSlot.createMany({
+      data: generated.filter(
+        (candidate) =>
+          !existing.some(
+            (slot) =>
+              candidate.startsAt < slot.endsAt &&
+              candidate.endsAt > slot.startsAt,
+          ),
+      ),
       skipDuplicates: true,
     });
   }
 
   async validateSlot(tx: Tx, tenantId: string, slotId: string, lock = false) {
+    if (lock)
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`schedule:${tenantId}`},0))`;
     if (lock)
       await tx.$queryRaw`SELECT "id" FROM "PickupSlot" WHERE "id" = ${slotId}::uuid AND "tenantId" = ${tenantId}::uuid FOR UPDATE`;
     const s = await tx.pickupSlot.findFirst({

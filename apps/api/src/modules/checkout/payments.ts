@@ -377,6 +377,9 @@ export class PaymentService {
             where: { id: o.id },
             data: {
               status: safe ? 'CONFIRMED' : 'REQUIRES_REVIEW',
+              ...(safe && !o.fulfillmentStatus
+                ? { fulfillmentStatus: 'NEW' as const }
+                : {}),
               confirmedAt: safe ? this.now() : null,
               reviewReason: safe ? null : 'late_settlement',
             },

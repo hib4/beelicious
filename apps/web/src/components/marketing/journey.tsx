@@ -58,7 +58,7 @@ export function Journey() {
             >
               <h3>{step.title}</h3>
               <p>{step.description}</p>
-              <p className="chapter-detail">{step.detail}</p>
+              {/* <p className="chapter-detail">{step.detail}</p> */}
             </div>
           ))}
           <div

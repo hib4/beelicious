@@ -49,9 +49,19 @@ npx playwright install chromium
 npm run test:e2e # Tests the previously built frontend
 ```
 
-The editorial page follows [DESIGN.md](DESIGN.md): oversized type, the original Bee-bot, licensed food photography, and a six-chapter WhatsApp story. GSAP pins one preview on capable desktops; mobile, reduced-motion, and no-JavaScript views retain the full vertical story. [Photo sources and licenses](apps/web/ASSETS.md) are also credited in the footer. Semantic tokens live in `apps/web/src/app/globals.css`; the original mascot is in `apps/web/public/brand/bee-bot.png`. Fonts are locally served. Editorial photographs are not merchant menu photos. Verified merchant imagery remains unavailable, and preview catalog/pickup data is illustrative. Marketing components and UI primitives are separate; future authenticated operational layouts can use the same tokens while Fastify remains the business API. No dashboard exists yet.
+The editorial page follows [DESIGN.md](DESIGN.md): oversized type, the original Bee-bot, licensed food photography, and a six-chapter WhatsApp story. GSAP pins one preview on capable desktops; mobile, reduced-motion, and no-JavaScript views retain the full vertical story. [Photo sources and licenses](apps/web/ASSETS.md) are also credited in the footer. Semantic tokens live in `apps/web/src/app/globals.css`; the original mascot is in `apps/web/public/brand/bee-bot.png`. Fonts are locally served. Editorial photographs are not merchant menu photos. Verified merchant imagery remains unavailable, and preview catalog/pickup data is illustrative. Marketing components and UI primitives are separate; future authenticated operational layouts can use the same tokens while Fastify remains the business API. The private tenant dashboard uses a separate operational layout.
 
 Deploy the web workspace independently with `npm run build:web` and `npm run start:web` (or the equivalent Next.js platform adapter). Configure public values in the build environment; do not copy the backend `.env` or auth directory. Public launch requires verified service readiness, content, contact approval policy, and a deliberate indexing review.
+
+## Tenant dashboard
+
+Private routes start at `/login` and `/dashboard`. Supabase email/password authentication and database memberships restrict OWNER/STAFF access; public signup is disabled. The dashboard reads real orders, advances paid fulfillment, manages menus and protects pickup reservations. It remains off until `DASHBOARD_ENABLED=true` is configured separately for API and web.
+
+See [dashboard setup and APIs](docs/tenant-dashboard.md) for Supabase configuration, the controlled `tenant:member` CLI, role permissions and recovery rules. Fulfillment notifications use the existing messaging outbox; allowlists and Sandbox restrictions remain. Live authentication/email/device verification requires external setup.
+
+```bash
+npm run test:e2e:dashboard # After build + test migrations; uses isolated Auth mocks
+```
 
 ## WhatsApp development
 
@@ -162,7 +172,7 @@ The test database defaults to `DATABASE_URL` plus `_test`; override with `WHATSA
 
 ```text
 apps/api/             HTTP, messaging, conversations, catalog, cart, checkout
-apps/web/             Independent Next.js marketing frontend
+apps/web/             Next.js marketing frontend and private tenant dashboard
 packages/database/    Prisma schema, migrations, seeds, and connections
 packages/shared/      Reusable types and pure utilities
 ```
@@ -171,5 +181,5 @@ The modular monolith uses PostgreSQL transactions, scoped identities, deduplicat
 
 - Baileys is unofficial, development-only, and carries account-restriction risk.
 - Live Baileys QRIS delivery and Midtrans Sandbox end-to-end checkout remain unverified until tested with a real device and Sandbox account.
-- No production collection, automatic refunds, payouts, dashboards, authentication, or tenant fulfillment notifications are implemented. Uncertain payments may require manual investigation.
+- No production collection, automatic refunds, payouts, or admin dashboard is implemented. Uncertain payments and fulfillment exceptions require operational investigation.
 - Keep `.env`, credentials, and session data private. Preserve database volumes and payment history; avoid `docker compose down -v`.
