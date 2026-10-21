@@ -65,9 +65,6 @@ export default function Home() {
             <p className="food-intro">
               Tentang rasa yang familiar, pilihan yang beragam, dan obrolan yang
               mengantarmu ke menu berikutnya.
-              <span>
-                Fotografi editorial kuliner Indonesia. Bukan foto menu tenant.
-              </span>
             </p>
             {editorialPhotos.map((photo, index) => (
               <figure
@@ -183,31 +180,6 @@ export default function Home() {
               Pilot pengembangan
             </p>
           </div>
-          <details className="photo-credits">
-            <summary>Kredit fotografi editorial</summary>
-            <ul>
-              {editorialPhotos.map((photo) => (
-                <li key={photo.src}>
-                  <a
-                    href={photo.source}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {photo.title}
-                  </a>{' '}
-                  — {photo.creator} ·{' '}
-                  <a
-                    href={photo.licenseUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {photo.license}
-                  </a>
-                  . {photo.modifications}
-                </li>
-              ))}
-            </ul>
-          </details>
         </div>
       </footer>
     </>
