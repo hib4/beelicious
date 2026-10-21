@@ -44,17 +44,19 @@ Keep integration tests on a separate PostgreSQL database ending in `_test`. Set 
 
 Import the same Git repository as a **new** Vercel project, suggested name `beelicious-api`:
 
-| Setting                              | Value                                     |
-| ------------------------------------ | ----------------------------------------- |
-| Root Directory                       | `apps/api`                                |
-| Framework                            | Other (Node Functions; `framework: null`) |
-| Include files outside Root Directory | Enabled, for workspace packages           |
-| Node.js                              | 24.x                                      |
-| Install                              | `cd ../.. && npm ci --ignore-scripts`     |
-| Build                                | `cd ../.. && npm run build:api`           |
-| Output directory                     | Unset                                     |
+| Setting                              | Value                                               |
+| ------------------------------------ | --------------------------------------------------- |
+| Root Directory                       | `apps/api`                                          |
+| Framework                            | Other (Node Functions; `framework: null`)           |
+| Include files outside Root Directory | Enabled, for workspace packages                     |
+| Node.js                              | 24.x                                                |
+| Install                              | `cd ../.. && npm ci --include=dev --ignore-scripts` |
+| Build                                | `cd ../.. && npm run build:api`                     |
+| Output directory                     | Unset                                               |
 
 `apps/api/vercel.json` contains these commands and routes all paths to `api/index.ts`, a conventional Node function. It dispatches the original URL to Fastify after readiness. This intentionally avoids Fastify auto-detection selecting the existing `src/app.ts` factory or starting the long-lived server entrypoint. The API build generates Prisma and compiles workspace packages without building Next.js, migrating, or seeding.
+
+Keep `NODE_ENV=production`. The install command explicitly includes development dependencies because compilation needs TypeScript, Prisma CLI and type declarations, including `@types/proper-lockfile` and `@types/qrcode-terminal`. If Vercel has an Install Command override, update it to match. After changing this command, redeploy without the existing build cache. Compiling Baileys sources does not start the local messaging worker.
 
 Set private runtime environment variables in this new project:
 
