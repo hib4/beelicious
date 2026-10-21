@@ -1,0 +1,5 @@
+{
+  "framework": "nextjs",
+  "installCommand": "cd ../.. && npm ci --ignore-scripts",
+  "buildCommand": "npm run build"
+}
