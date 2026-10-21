@@ -1,5 +1,6 @@
 'use client';
 import { useEffect } from 'react';
+import { mountJourneyPlayback } from '@/lib/journey-playback';
 /** Progressive enhancement only: every chapter remains readable without this module. */
 export function ExperienceMotion() {
   useEffect(() => {
@@ -108,88 +109,9 @@ export function ExperienceMotion() {
           root,
         );
         media.add(
-          '(min-width: 1024px) and (min-height: 720px) and (pointer: fine) and (prefers-reduced-motion: no-preference)',
+          '(prefers-reduced-motion: no-preference)',
           () => {
-            if (!story) return;
-            const chapters = Array.from(
-              story.querySelectorAll<HTMLElement>('[data-chapter]'),
-            );
-            const panels = Array.from(
-              story.querySelectorAll<HTMLElement>('[data-panel]'),
-            );
-            const progress = Array.from(
-              story.querySelectorAll<HTMLElement>('[data-progress]'),
-            );
-            const links = Array.from(
-              story.querySelectorAll<HTMLAnchorElement>('.chapter-nav a'),
-            );
-            story.dataset.enhanced = 'true';
-            story.classList.remove('is-rest');
-            story.classList.add('is-live');
-            let active = -1;
-            const show = (index: number, instant = false) => {
-              if (index === active) return;
-              active = index;
-              story.dataset.activeChapter = String(index);
-              panels.forEach((panel, position) =>
-                gsap.to(panel, {
-                  autoAlpha: position === index ? 1 : 0,
-                  y: position === index ? 0 : 14,
-                  duration: instant ? 0 : 0.22,
-                  overwrite: true,
-                }),
-              );
-              progress.forEach(
-                (bar, position) =>
-                  (bar.dataset.active = String(position === index)),
-              );
-              links.forEach((link, position) => {
-                if (position === index)
-                  link.setAttribute('aria-current', 'step');
-                else link.removeAttribute('aria-current');
-              });
-            };
-            show(0, true);
-            ScrollTrigger.create({
-              trigger: '.journey-body',
-              pin: '.journey-visual',
-              start: 'top 96px',
-              end: 'bottom bottom-=24px',
-              pinSpacing: false,
-              invalidateOnRefresh: true,
-              id: 'beelicious-journey',
-            });
-            chapters.forEach((chapter, index) => {
-              ScrollTrigger.create({
-                trigger: chapter,
-                start: 'top 55%',
-                end: 'bottom 55%',
-                onEnter: () => show(index),
-                onEnterBack: () => show(index),
-              });
-            });
-            ScrollTrigger.refresh();
-            let current = 0;
-            chapters.forEach((chapter, index) => {
-              if (
-                chapter.getBoundingClientRect().top <=
-                window.innerHeight * 0.55
-              )
-                current = index;
-            });
-            show(current, true);
-            return () => {
-              panels.forEach((panel) => {
-                gsap.killTweensOf(panel);
-                panel.removeAttribute('style');
-              });
-              story.classList.remove('is-live');
-              story.classList.add('is-rest');
-              delete story.dataset.enhanced;
-              delete story.dataset.activeChapter;
-              links.forEach((link) => link.removeAttribute('aria-current'));
-              progress.forEach((bar) => delete bar.dataset.active);
-            };
+            if (story) return mountJourneyPlayback(story, gsap);
           },
           root,
         );

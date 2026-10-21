@@ -118,7 +118,7 @@ svg {
   min-height: 56px;
   padding: 16px 28px;
   border: 0;
-  border-radius: var(--radius-pill);
+  border-radius: 999px;
   color: var(--ink);
   font-size: 16px;
   font-weight: 600;
@@ -440,8 +440,61 @@ svg {
   font-size: 14px;
   max-width: 42ch;
 }
-.journey-visual {
+.journey-demo {
   display: none;
+}
+.journey [hidden] {
+  display: none !important;
+}
+.journey[data-playback] .journey-demo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 100px;
+  align-items: center;
+}
+.journey-narrative .chapter-copy {
+  min-height: 300px;
+}
+.journey-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 32px;
+}
+.journey-controls button {
+  min-height: 44px;
+  padding: 10px 20px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--bee);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.journey-controls button + button {
+  background: var(--parchment);
+}
+.journey-controls button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.journey-playback-status {
+  margin-top: 16px;
+  font-size: 14px;
+  min-height: 3em;
+}
+.journey-full-transcript {
+  margin-top: 40px;
+}
+.journey-full-transcript summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding-block: 12px;
+  font-size: 16px;
+}
+.journey-visual {
+  height: 580px;
+  min-width: 0;
 }
 .transcript {
   display: flex;
@@ -472,35 +525,10 @@ svg {
   margin-top: 40px;
   font-size: 14px;
 }
-.journey[data-enhanced] .journey-body {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 100px;
-  align-items: start;
-}
-.journey[data-enhanced] .journey-chapters > li {
-  display: flex;
-  min-height: 56svh;
-  padding: 40px 0;
-}
-/* Accessible transcript remains in the reading order, not a visual divider. taste-skill-ignore */
-.journey[data-enhanced] .inline-transcript {
-  position: absolute;
-  width: 1px;
-  height: 1px; /* taste-skill-ignore: standard visually hidden accessible transcript */
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-.journey[data-enhanced] .journey-visual {
-  display: block;
-  align-self: start;
-  height: min(640px, calc(100svh - 120px));
-}
 .journey-stage {
   position: relative;
+  display: flex;
+  flex-direction: column;
   height: 100%;
   width: 100%;
   background: var(--parchment);
@@ -508,6 +536,7 @@ svg {
   overflow: clip;
 }
 .stage-heading {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -520,41 +549,44 @@ svg {
   font-weight: 800;
   letter-spacing: -0.04em;
 }
-.journey-panel {
-  position: absolute;
-  inset: 92px 0 48px;
-  padding: 0 28px;
+.journey-chat-viewport {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  margin: 0 28px 24px;
 }
-.panel-heading {
-  font-family: var(--display);
-  font-size: 24px;
-  font-weight: 700;
+.journey-chat-track {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  will-change: transform;
 }
-.journey-panel .transcript {
-  padding: 20px 0 0;
+.journey-exchange .transcript {
+  padding: 0;
   background: transparent;
   font-size: 16px;
   min-height: 0;
 }
-.panel-context {
-  margin-top: 24px;
-  font-size: 14px;
-}
-.stage-progress {
-  position: absolute;
-  bottom: 24px;
-  left: 28px;
-  right: 28px;
+.chat-typing {
   display: flex;
-  gap: 8px;
+  align-self: flex-start;
+  align-items: center;
+  gap: 5px;
+  padding: 18px;
+  border-radius: 2px 20px 20px 20px;
+  background: var(--ivory);
+  color: var(--ink);
 }
-.stage-progress span {
-  height: 5px;
-  flex: 1;
-  background: var(--hairline);
+.chat-typing > span:not(.typing-label) {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
 }
-.stage-progress span[data-active='true'] {
-  background: var(--ink);
+.typing-label {
+  margin-left: 8px;
+  font-size: 12px;
 }
 .merchant-editorial {
   background: var(--bee);
@@ -731,7 +763,7 @@ svg {
   .journey-heading {
     gap: 32px;
   }
-  .journey[data-enhanced] .journey-body {
+  .journey[data-playback] .journey-demo {
     gap: 48px;
   }
   .merchant-spotlight {
@@ -909,6 +941,30 @@ svg {
     margin-top: 32px;
     margin-bottom: 16px;
     gap: 4px 20px;
+  }
+  .journey[data-playback] .journey-demo {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .journey-narrative .chapter-copy {
+    min-height: 230px;
+  }
+  .journey-controls {
+    margin-top: 16px;
+  }
+  .journey-visual {
+    height: 440px;
+  }
+  .stage-heading {
+    padding: 20px;
+    gap: 12px;
+    font-size: 12px;
+  }
+  .journey-chat-viewport {
+    margin: 0 20px 20px;
+  }
+  .journey-exchange .transcript {
+    font-size: 14px;
   }
   .journey-chapters > li {
     grid-template-columns: 1fr;

@@ -25,10 +25,11 @@ describe('landing page', () => {
     ).toBeInTheDocument();
     expect(document.querySelectorAll('[data-chapter]')).toHaveLength(6);
     expect(document.querySelectorAll('[data-editorial-photo]')).toHaveLength(3);
-    expect(screen.getByText('Pexels License')).toHaveAttribute(
-      'href',
-      'https://www.pexels.com/license/',
-    );
+    expect(document.querySelectorAll('[data-chat-track]')).toHaveLength(1);
+    expect(document.querySelectorAll('[data-exchange]')).toHaveLength(6);
+    expect(
+      document.querySelectorAll('.journey-panel, .stage-progress'),
+    ).toHaveLength(0);
     expect(screen.getByAltText(/Bee-bot, maskot/)).toHaveAttribute(
       'alt',
       expect.stringContaining('dua mata hitam'),

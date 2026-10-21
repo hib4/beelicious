@@ -12,7 +12,7 @@ for (const width of [320, 375, 390, 768, 1280, 1440]) {
       'LAPAR?CHAT AJA.',
     );
     await expect(page.locator('.hero-action .button')).toBeVisible();
-    await expect(page.locator('.journey')).not.toHaveAttribute('data-enhanced');
+    await expect(page.locator('.journey')).not.toHaveAttribute('data-playback');
     await expect(page.locator('.pin-spacer')).toHaveCount(0);
     expect(
       await page.evaluate(
@@ -118,62 +118,170 @@ test('ordering configuration and local assets remain safe', async ({
   expect(await (await request.get('/robots.txt')).text()).toContain(
     'Disallow: /',
   );
-  await page.getByText('Kredit fotografi editorial').click();
-  await expect(page.locator('.photo-credits li')).toHaveCount(3);
   expect(failures).toEqual([]);
 });
-test('one desktop pin follows chapters in both scroll directions and cleans up on resize', async ({
+test('live chat reveals a customer, typing indicator, then reply without page scrolling', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/');
   const story = page.locator('[data-journey]');
-  await expect(story).toHaveAttribute('data-enhanced', 'true');
-  await expect(page.locator('.pin-spacer')).toHaveCount(1);
-  for (const index of [0, 1, 2, 3, 4, 5, 3, 1, 0]) {
-    const id = journeySteps[index]!.id;
-    await page
-      .locator(`#${id}`)
-      .evaluate((element) =>
-        window.scrollTo(
-          0,
-          element.getBoundingClientRect().top + scrollY - innerHeight * 0.3,
-        ),
-      );
-    await expect(story).toHaveAttribute('data-active-chapter', String(index));
-    await expect(page.locator(`[data-panel="${id}"]`)).toBeVisible();
-  }
-  await page.setViewportSize({ width: 768, height: 1024 });
-  await expect(story).not.toHaveAttribute('data-enhanced');
-  await expect(page.locator('.pin-spacer')).toHaveCount(0);
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await expect(page.locator('.pin-spacer')).toHaveCount(1);
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await expect(story).not.toHaveAttribute('data-enhanced');
-  await expect(page.locator('.pin-spacer')).toHaveCount(0);
-  await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await expect(page.locator('.pin-spacer')).toHaveCount(1);
+  await expect(story).toHaveAttribute('data-playback', 'true');
+  const viewport = page.locator('.journey-chat-viewport');
+  await viewport.scrollIntoViewIfNeeded();
+  await expect(story).toHaveAttribute('data-chat-phase', 'customer');
+  const first = page.locator('[data-exchange="halo"]');
+  await expect(first.locator('[data-customer]')).toBeVisible();
+  await expect(first.locator('[data-response]')).toBeHidden();
+  const scrollY = await page.evaluate(() => window.scrollY);
+  await expect(page.locator('[data-typing]')).toBeVisible();
+  await expect(first.locator('[data-response]')).toBeHidden();
+  await expect(first.locator('[data-response]')).toBeVisible();
+  await expect(page.locator('[data-typing]')).toBeHidden();
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrollY);
+  await expect(
+    page.locator('.pin-spacer, .journey-panel, .stage-progress'),
+  ).toHaveCount(0);
+  await expect(page.locator('.journey-full-transcript')).not.toHaveAttribute(
+    'open',
+  );
 });
-test('chapter links navigate to the actual story and short desktops never pin', async ({
+
+test('pause, chapter selection, continuation, and replay preserve a single conversation', async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/');
-  await expect(page.locator('[data-journey]')).toHaveAttribute(
-    'data-enhanced',
-    'true',
-  );
-  await page
-    .getByRole('navigation', { name: 'Bagian contoh percakapan' })
-    .getByRole('link', { name: 'Tentukan waktunya' })
-    .click();
-  await expect(page).toHaveURL(/#atur-pickup$/);
-  await expect(page.locator('[data-journey]')).toHaveAttribute(
-    'data-active-chapter',
-    '4',
-  );
+  const story = page.locator('[data-journey]');
+  await expect(story).toHaveAttribute('data-playback', 'true');
+  const links = page.getByRole('navigation', {
+    name: 'Bagian contoh percakapan',
+  });
+  await links.getByRole('link', { name: 'Tentukan waktunya' }).click();
+  await expect(story).toHaveAttribute('data-active-chapter', '4');
+  await expect(story).toHaveAttribute('data-playback-status', 'paused');
+  await expect(page.locator('[data-exchange]:not([hidden])')).toHaveCount(5);
+  await expect(page.locator('[data-exchange="ikuti-instruksi"]')).toBeHidden();
+  await page.getByRole('button', { name: 'Lanjutkan', exact: true }).click();
+  await page.locator('.journey-chat-viewport').scrollIntoViewIfNeeded();
+  await expect(story).toHaveAttribute('data-active-chapter', '5');
+  await expect(
+    page.locator('[data-exchange="ikuti-instruksi"] [data-response]'),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Jeda', exact: true }).click();
+  await expect(story).toHaveAttribute('data-playback-status', 'paused');
+  await page.waitForTimeout(1500);
+  await expect(story).toHaveAttribute('data-playback-status', 'paused');
+  await page.getByRole('button', { name: 'Putar Ulang', exact: true }).click();
+  await expect(story).toHaveAttribute('data-active-chapter', '0');
+  await expect(page.locator('[data-exchange="ikuti-instruksi"]')).toBeHidden();
+  await expect(page.locator('[data-chat-track]')).toHaveCount(1);
+  await page.getByText('Baca percakapan lengkap', { exact: true }).click();
+  for (const step of journeySteps)
+    await expect(page.locator(`#${step.id} .inline-transcript`)).toBeVisible();
+});
+
+test('playback pauses offscreen and in a hidden tab without overriding manual pause', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const story = page.locator('[data-journey]');
+  await expect(story).toHaveAttribute('data-playback', 'true');
+  await page.locator('.journey-chat-viewport').scrollIntoViewIfNeeded();
+  await expect(story).toHaveAttribute('data-playback-status', 'playing');
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', {
+      configurable: true,
+      value: true,
+    });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect(story).toHaveAttribute('data-playback-status', 'paused');
+  const phase = await story.getAttribute('data-chat-phase');
+  await page.waitForTimeout(1600);
+  await expect(story).toHaveAttribute('data-chat-phase', phase!);
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', {
+      configurable: true,
+      value: false,
+    });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect(story).toHaveAttribute('data-playback-status', 'playing');
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+  await expect(story).toHaveAttribute('data-playback-status', 'paused');
+  await page.locator('.journey-chat-viewport').scrollIntoViewIfNeeded();
+  await expect(story).toHaveAttribute('data-playback-status', 'playing');
+  await page.getByRole('button', { name: 'Jeda', exact: true }).click();
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+  await page.locator('.journey-chat-viewport').scrollIntoViewIfNeeded();
+  await expect(story).toHaveAttribute('data-playback-status', 'paused');
+});
+
+test('mobile playback resizes, follows the latest reply, and fully reverts for reduced motion', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  const story = page.locator('[data-journey]');
+  await expect(story).toHaveAttribute('data-playback', 'true');
+  await page.locator('.journey-chat-viewport').scrollIntoViewIfNeeded();
+  await expect(story).toHaveAttribute('data-playback-status', 'playing');
+  await page.locator('[data-select-chapter="ikuti-instruksi"]').click();
+  await expect(story).toHaveAttribute('data-playback-status', 'complete');
+  const assertFinalFits = async () => {
+    await expect
+      .poll(() =>
+        page
+          .locator('[data-exchange="ikuti-instruksi"]')
+          .evaluate((element) => {
+            const viewport = element
+              .closest('.journey-chat-viewport')!
+              .getBoundingClientRect();
+            const box = element.getBoundingClientRect();
+            return (
+              box.top >= viewport.top - 2 && box.bottom <= viewport.bottom + 2
+            );
+          }),
+      )
+      .toBe(true);
+  };
+  await assertFinalFits();
   await page.setViewportSize({ width: 1280, height: 650 });
+  await assertFinalFits();
   await expect(page.locator('.pin-spacer')).toHaveCount(0);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(story).not.toHaveAttribute('data-playback');
+  await expect(page.locator('[data-chat-track]')).not.toHaveAttribute('style');
+  await expect(page.locator('.journey-full-transcript')).toHaveAttribute(
+    'open',
+    '',
+  );
+  for (const step of journeySteps)
+    await expect(page.locator(`#${step.id} .inline-transcript`)).toBeVisible();
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await expect(story).toHaveAttribute('data-playback', 'true');
+  await expect(page.locator('[data-chat-track]')).toHaveCount(1);
+});
+
+test('the full sequence completes once and retains the final payment reply', async ({
+  page,
+}) => {
+  test.setTimeout(45000);
+  await page.goto('/');
+  const story = page.locator('[data-journey]');
+  await expect(story).toHaveAttribute('data-playback', 'true');
+  await page.locator('.journey-chat-viewport').scrollIntoViewIfNeeded();
+  await expect(story).toHaveAttribute('data-playback-status', 'complete', {
+    timeout: 35000,
+  });
+  await expect(page.locator('[data-exchange]:not([hidden])')).toHaveCount(6);
+  await expect(
+    page.locator('.journey-chat-track [data-response]:not([hidden])'),
+  ).toHaveCount(6);
+  await expect(page.locator('[data-typing]')).toBeHidden();
+  await page.waitForTimeout(1600);
+  await expect(story).toHaveAttribute('data-active-chapter', '5');
+  await expect(story).toHaveAttribute('data-playback-status', 'complete');
 });
 test('without JavaScript all content and transcripts remain accessible', async ({
   browser,
@@ -186,7 +294,7 @@ test('without JavaScript all content and transcripts remain accessible', async (
   await page.goto('http://127.0.0.1:3101/');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   await expect(page.locator('[data-journey]')).not.toHaveAttribute(
-    'data-enhanced',
+    'data-playback',
   );
   for (const step of journeySteps)
     await expect(page.locator(`#${step.id} .inline-transcript`)).toBeVisible();

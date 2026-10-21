@@ -8,15 +8,19 @@ function Transcript({
 }) {
   return (
     <div className="transcript" data-ui>
-      <p className="chat-customer">{customer}</p>
-      <p className="chat-response">{response}</p>
+      <p className="chat-customer" data-customer>
+        {customer}
+      </p>
+      <p className="chat-response" data-response>
+        {response}
+      </p>
     </div>
   );
 }
 export function Journey() {
   return (
     <section
-      className="journey is-rest"
+      className="journey"
       id="cara-kerja"
       aria-labelledby="journey-title"
       data-journey
@@ -29,8 +33,8 @@ export function Journey() {
           BANYAK PILIHAN.
         </h2>
         <p>
-          Begini cara kerjanya. Ikuti ceritanya, atau langsung pilih bagian yang
-          ingin kamu lihat.
+          Lihat bagaimana satu sapaan menjadi percakapan. Putar ceritanya, atau
+          pilih bagian yang ingin kamu lihat.
         </p>
       </div>
       <nav
@@ -38,12 +42,73 @@ export function Journey() {
         aria-label="Bagian contoh percakapan"
       >
         {journeySteps.map((step) => (
-          <a key={step.id} href={`#${step.id}`}>
+          <a key={step.id} href={`#${step.id}`} data-select-chapter={step.id}>
             {step.title.replace('.', '')}
           </a>
         ))}
       </nav>
-      <div className="page-frame journey-body">
+      <div className="page-frame journey-demo">
+        <div className="journey-narrative">
+          {journeySteps.map((step, index) => (
+            <div
+              className="chapter-copy"
+              key={step.id}
+              data-explanation={step.id}
+              hidden={index !== 0}
+            >
+              <h3>{step.title}</h3>
+              <p>{step.description}</p>
+              <p className="chapter-detail">{step.detail}</p>
+            </div>
+          ))}
+          <div
+            className="journey-controls"
+            aria-label="Kontrol ilustrasi percakapan"
+          >
+            <button type="button" data-playback-toggle>
+              Jeda
+            </button>
+            <button type="button" data-playback-replay>
+              Putar Ulang
+            </button>
+          </div>
+          <p className="journey-playback-status" data-playback-label>
+            Demo mulai saat percakapan terlihat.
+          </p>
+        </div>
+        <div className="journey-visual" aria-hidden="true">
+          <div className="journey-stage">
+            <div className="stage-heading">
+              <span>beelicious.</span>
+              <span>Ilustrasi percakapan</span>
+            </div>
+            <div className="journey-chat-viewport">
+              <div className="journey-chat-track" data-chat-track>
+                {journeySteps.map((step) => (
+                  <div
+                    key={step.id}
+                    className="journey-exchange"
+                    data-exchange={step.id}
+                  >
+                    <Transcript
+                      customer={step.customer}
+                      response={step.response}
+                    />
+                  </div>
+                ))}
+                <div className="chat-typing" data-typing hidden>
+                  <span />
+                  <span />
+                  <span />
+                  <span className="typing-label">Bee-bot sedang mengetik</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <details className="page-frame journey-full-transcript" open>
+        <summary>Baca percakapan lengkap</summary>
         <ol className="journey-chapters">
           {journeySteps.map((step) => (
             <li key={step.id} id={step.id} data-chapter={step.id}>
@@ -58,35 +123,7 @@ export function Journey() {
             </li>
           ))}
         </ol>
-        <div className="journey-visual" aria-hidden="true">
-          <div className="journey-stage">
-            <div className="stage-heading">
-              <span>beelicious.</span>
-              <span>Ilustrasi percakapan</span>
-            </div>
-            {journeySteps.map((step, index) => (
-              <div key={step.id} className="journey-panel" data-panel={step.id}>
-                <p className="panel-heading">{step.title}</p>
-                <Transcript customer={step.customer} response={step.response} />
-                <p className="panel-context">
-                  {index === 5
-                    ? 'Pembayaran pilot / Sandbox'
-                    : 'Balas nomor, lanjutkan percakapan.'}
-                </p>
-              </div>
-            ))}
-            <div className="stage-progress">
-              {journeySteps.map((step) => (
-                <span key={step.id} data-progress={step.id} />
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-      <p className="page-frame journey-disclaimer">
-        Ilustrasi alur Beelicious. Menu, harga, dan jam pickup adalah contoh
-        pengembangan. Tampilan WhatsApp mengikuti perangkatmu.
-      </p>
+      </details>
     </section>
   );
 }
