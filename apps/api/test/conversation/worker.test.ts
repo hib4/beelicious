@@ -55,10 +55,18 @@ it('bounds preparation failures, emits sanitized logs and never sends an uncommi
         lastError: 'conversation_preparation_failed',
       });
     }
-    expect(warn.mock.calls.flat()).toEqual([
-      'conversation_preparation_failed',
-      'conversation_preparation_failed',
-    ]);
+    expect(warn.mock.calls).toHaveLength(2);
+    for (const call of warn.mock.calls) {
+      expect(call).toEqual([
+        'conversation_preparation_failed',
+        {
+          category: 'unknown',
+          stage: 'unknown',
+          elapsedMs: expect.any(Number),
+        },
+      ]);
+    }
+    expect(JSON.stringify(warn.mock.calls)).not.toContain('private db detail');
     expect(adapter.outgoing).toHaveLength(0);
     expect(store.beginSend).not.toHaveBeenCalled();
   } finally {

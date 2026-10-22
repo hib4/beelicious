@@ -21,7 +21,10 @@ async function main() {
         ? { qr: (value: string) => qrcode.generate(value, { small: true }) }
         : {}),
     },
-    (event) => console.warn(JSON.stringify({ event })),
+    (event, diagnostic) =>
+      console.warn(
+        JSON.stringify({ event, ...(diagnostic ? { diagnostic } : {}) }),
+      ),
   );
   let closing: Promise<void> | undefined;
   const shutdown = (exitCode: number) =>

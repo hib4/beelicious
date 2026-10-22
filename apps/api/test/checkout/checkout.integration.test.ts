@@ -844,7 +844,10 @@ it('rolls checkout and capacity back when the enclosing conversation transaction
   const f = await fixture();
   await expect(
     p.$transaction(async (tx) => {
-      await new OrderService(tx, config, now).createFromCart(f.scope, f.input);
+      await new OrderService(tx, config, now, true).createFromCart(
+        f.scope,
+        f.input,
+      );
       throw new Error('Injected failure before response intent');
     }),
   ).rejects.toThrow('Injected failure');

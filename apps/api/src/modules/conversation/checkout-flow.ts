@@ -8,7 +8,7 @@ import type { Prisma } from '@beelicious/database';
 import { matchesGateway, type CheckoutConfig } from '../checkout/config.js';
 import { OrderService, type CheckoutScope } from '../checkout/orders.js';
 import { PickupSlotService, pickupLabel } from '../checkout/pickup.js';
-import { CartService } from '../cart/service.js';
+import { CartService, type LockedCartSession } from '../cart/service.js';
 import { DomainError } from '../catalog/validation.js';
 import { initialData, rupiah, type Context } from './flow.js';
 import type { Command } from './commands.js';
@@ -21,6 +21,7 @@ export interface CheckoutDependencies {
   chatId?: string;
   recipientPhone?: string;
   maxQuantity: number;
+  lockedSession?: LockedCartSession;
 }
 const states = [
   'SELECT_PICKUP',
@@ -37,8 +38,8 @@ export async function checkoutTransition(
   refresh = false,
 ): Promise<{ context: Context; text: string } | null> {
   const c = structuredClone(original);
-  const orders = new OrderService(d.tx, d.config, d.now);
-  const carts = new CartService(d.tx, d.maxQuantity);
+  const orders = new OrderService(d.tx, d.config, d.now, true, d.lockedSession);
+  const carts = new CartService(d.tx, d.maxQuantity, true, d.lockedSession);
   const current = await orders.current(d.scope);
   const ownedFlow = states.includes(c.state);
   const unresolved =

@@ -160,6 +160,23 @@ npm run build
 
 Actual Vercel function packaging/routing, Supabase pool connectivity and live Auth/WhatsApp/Midtrans behavior require an actual configured deployment. Local mocks do not verify them. This deployment configuration does not activate production payments or provide an always-on worker. Losing the local computer or session storage still interrupts WhatsApp service. Keep database backups and monitor failed/review/uncertain records using existing safe developer tools.
 
+## Quantity preparation troubleshooting
+
+Conversation preparation uses one caller-owned transaction for cart changes, session progress and the response intent. Cart/Order helpers bound to that transaction must not create nested transactions. The engine can supply its verified locked session scope to avoid repeated session locks; this internal value must never come from an HTTP/customer payload. Standalone service operations retain their own locking and bounded transaction retries.
+
+Hosted database round trips can exceed Prisma's default five-second transaction timeout. Conversation transactions allow up to 15 seconds, with a 20-second total preparation budget including retries and identity lookup. Transaction acquisition allows at most two seconds. A final ownership/expiry check prevents committing cart/session/response changes after the existing 30-second inbox lease has expired. No gateway or WhatsApp call runs inside this transaction.
+
+`conversation_preparation_failed` now includes a safe `diagnostic` object containing category, stage, elapsedMs and an optional Prisma code. It never includes raw exception text, message content, customer identifiers or connection credentials. P2028 is classified as a transaction error; it does not by itself prove a timeout. Budget failures and lost leases have explicit categories. Preparation retries and sending/uncertain behavior remain unchanged.
+
+After updating a compiled worker, stop the old process and run:
+
+```bash
+npm run build:api
+npm run start:worker
+```
+
+Submit a new quantity message from the approved test contact. Failed inbox records are not automatically replayed and sessions/carts are not reset. Inspect the safe diagnostic fields if the operation still fails. Do not reset the database or clear deduplication keys to recover this flow. Automated delay, rollback and lease tests do not establish real-device delivery.
+
 ## References
 
 - [Vercel Node.js Functions](https://vercel.com/docs/functions/runtimes/node-js)

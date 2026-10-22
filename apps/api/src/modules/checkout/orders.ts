@@ -28,11 +28,22 @@ export class OrderService {
     private db: PrismaClient | Tx,
     private config: CheckoutConfig,
     private now = () => new Date(),
+    private transactionBound = false,
+    private lockedScope?: CheckoutScope,
   ) {}
   async run<T>(scope: CheckoutScope, fn: (tx: Tx) => Promise<T>): Promise<T> {
     if (!scopeSchema.safeParse(scope).success)
       throw new DomainError('invalid_input');
     const work = async (tx: Tx) => {
+      if (this.lockedScope) {
+        if (
+          !this.transactionBound ||
+          this.lockedScope.customerId !== scope.customerId ||
+          this.lockedScope.sessionId !== scope.sessionId
+        )
+          throw new DomainError('not_found');
+        return fn(tx);
+      }
       await tx.$queryRaw`SELECT "id" FROM "ConversationSession" WHERE "id" = ${scope.sessionId}::uuid FOR UPDATE`;
       const s = await tx.conversationSession.findFirst({
         where: {
@@ -43,7 +54,8 @@ export class OrderService {
       if (!s) throw new DomainError('not_found');
       return fn(tx);
     };
-    if (!('$transaction' in this.db)) return work(this.db);
+    if (this.transactionBound || !('$transaction' in this.db))
+      return work(this.db as Tx);
     for (let attempt = 0; ; attempt++) {
       try {
         return await this.db.$transaction(work, {
@@ -52,7 +64,7 @@ export class OrderService {
       } catch (e) {
         if (attempt < 2 && isTransactionConflict(e)) continue;
         if (e instanceof DomainError) throw e;
-        throw new DomainError('unavailable');
+        throw new DomainError('unavailable', { cause: e });
       }
     }
   }

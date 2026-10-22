@@ -1,3 +1,8 @@
+import { performance } from 'node:perf_hooks';
+import {
+  type PreparationLogger,
+  preparationDiagnostic,
+} from '../conversation/diagnostics.js';
 import type { ConversationInput } from '../conversation/commands.js';
 import type { ConversationHandler } from '../conversation/engine.js';
 import { randomUUID } from 'node:crypto';
@@ -26,7 +31,7 @@ export function createInboxWorker(
   store: WhatsAppEventStore,
   adapter: MessagingAdapter,
   policy: WorkerPolicy,
-  warn: (event: string) => void,
+  warn: PreparationLogger,
   now: () => Date = () => new Date(),
 ): Worker {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -78,14 +83,18 @@ export function createInboxWorker(
         });
         return;
       }
+      const preparingAt = performance.now();
       try {
         text = await policy.conversation.handleIncomingMessage(
           event.id,
           token,
           message.conversation,
         );
-      } catch {
-        warn('conversation_preparation_failed');
+      } catch (error) {
+        warn(
+          'conversation_preparation_failed',
+          preparationDiagnostic(error, performance.now() - preparingAt),
+        );
         await finish({
           state: (event.preparationAttempts ?? 0) >= 5 ? 'failed' : 'pending',
           availableAt: new Date(now().getTime() + 5000),

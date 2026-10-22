@@ -115,9 +115,17 @@ export function buildApp(
   const runtime =
     dependencies.background === false
       ? undefined
-      : createBackgroundRuntime(config, database, dependencies, (event) => {
-          app.log.warn({ event }, 'Background processing requires attention');
-        });
+      : createBackgroundRuntime(
+          config,
+          database,
+          dependencies,
+          (event, diagnostic) => {
+            app.log.warn(
+              { event, ...(diagnostic ? { diagnostic } : {}) },
+              'Background processing requires attention',
+            );
+          },
+        );
   app.addHook('onListen', async () => {
     try {
       await runtime?.start();

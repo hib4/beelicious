@@ -1,3 +1,9 @@
+import { performance } from 'node:perf_hooks';
+import {
+  PreparationLimitError,
+  recordPreparationFailure,
+  type PreparationStage,
+} from './diagnostics.js';
 import { checkoutTransition } from './checkout-flow.js';
 import type { CheckoutConfig } from '../checkout/config.js';
 import {
@@ -33,194 +39,253 @@ export class ConversationEngine implements ConversationHandler {
     token: string,
     value: ConversationInput,
   ): Promise<string> {
-    const input = conversationInputSchema.parse(value);
-    const claimed = await this.db.whatsAppEvent.findFirst({
-      where: {
-        id: eventId,
-        leaseToken: token,
-        state: 'processing',
-        leaseUntil: { gt: this.now() },
-        processingMode: 'conversation',
-      },
-      select: { data: true },
-    });
-    if (!claimed) throw new Error('Conversation lease lost');
-    const envelope = claimed.data as { conversation?: unknown };
-    const stored = conversationInputSchema.safeParse(envelope.conversation);
-    if (
-      !stored.success ||
-      JSON.stringify(stored.data) !== JSON.stringify(input)
-    )
-      throw new Error('Conversation event mismatch');
-    const identity: MessagingIdentity =
-      input.provider === 'baileys'
-        ? {
-            accountId: input.accountId,
-            provider: 'baileys',
-            providerUserId: input.senderId,
-            identifierType: input.senderId.endsWith('@lid') ? 'lid' : 'jid',
-          }
-        : input.provider === 'mock'
-          ? {
-              provider: 'mock',
-              accountId: input.accountId,
-              providerUserId: input.senderId,
-              identifierType: 'mock-user',
-            }
-          : {
-              provider: 'cloud-api',
-              accountId: input.accountId,
-              providerUserId: input.senderId,
-              identifierType: 'cloud-user',
-            };
-    // Only the identity fields enter CustomerService; no alias inference or raw text.
-    const normalizedIdentity = {
-      provider: identity.provider,
-      accountId: identity.accountId,
-      providerUserId: identity.providerUserId,
-      identifierType: identity.identifierType,
+    const started = performance.now();
+    let stage: PreparationStage = 'validation';
+    const budget = () => {
+      const remaining = 20000 - (performance.now() - started);
+      if (remaining <= 0) throw new PreparationLimitError('budget_exceeded');
+      return remaining;
     };
-    const customer = await new CustomerService(this.db).register(
-      normalizedIdentity,
-    );
-    const record = await this.db.customerMessagingIdentity.findUniqueOrThrow({
-      where: {
-        provider_accountId_providerUserId: {
-          provider: input.provider,
-          accountId: input.accountId,
-          providerUserId: input.senderId,
+    try {
+      const input = conversationInputSchema.parse(value);
+      const claimed = await this.db.whatsAppEvent.findFirst({
+        where: {
+          id: eventId,
+          leaseToken: token,
+          state: 'processing',
+          leaseUntil: { gt: this.now() },
+          processingMode: 'conversation',
         },
-      },
-    });
-    if (record.customerId !== customer.id)
-      throw new Error('Identity ownership mismatch');
-    for (let attempt = 0; ; attempt++) {
-      try {
-        return await this.db.$transaction(
-          async (tx) => {
-            const now = this.now();
-            const events = await tx.$queryRaw<
-              { id: string }[]
-            >`SELECT "id" FROM "WhatsAppEvent" WHERE "id" = ${eventId} AND "leaseToken" = ${token} AND "state" = 'processing' AND "leaseUntil" > ${now} FOR UPDATE`;
-            if (!events.length) throw new Error('Conversation lease lost');
-            const previous = await tx.conversationTurn.findUnique({
-              where: { eventId },
-            });
-            if (previous) return previous.responseText;
-            await tx.conversationSession.createMany({
-              data: [
-                { messagingIdentityId: record.id, stateData: initialData() },
-              ],
-              skipDuplicates: true,
-            });
-            await tx.$queryRaw`SELECT "id" FROM "ConversationSession" WHERE "messagingIdentityId" = ${record.id}::uuid FOR UPDATE`;
-            const session = await tx.conversationSession.findUniqueOrThrow({
-              where: { messagingIdentityId: record.id },
-            });
-            const parsed = stateDataSchema.safeParse(session.stateData);
-            const context = parsed.success
-              ? { ...session, data: parsed.data }
-              : idle();
-            const checkoutResult = this.checkout
-              ? await checkoutTransition(
+        select: { data: true },
+      });
+      if (!claimed) throw new PreparationLimitError('lease_lost');
+      const envelope = claimed.data as { conversation?: unknown };
+      const stored = conversationInputSchema.safeParse(envelope.conversation);
+      if (
+        !stored.success ||
+        JSON.stringify(stored.data) !== JSON.stringify(input)
+      )
+        throw new Error('Conversation event mismatch');
+      const identity: MessagingIdentity =
+        input.provider === 'baileys'
+          ? {
+              accountId: input.accountId,
+              provider: 'baileys',
+              providerUserId: input.senderId,
+              identifierType: input.senderId.endsWith('@lid') ? 'lid' : 'jid',
+            }
+          : input.provider === 'mock'
+            ? {
+                provider: 'mock',
+                accountId: input.accountId,
+                providerUserId: input.senderId,
+                identifierType: 'mock-user',
+              }
+            : {
+                provider: 'cloud-api',
+                accountId: input.accountId,
+                providerUserId: input.senderId,
+                identifierType: 'cloud-user',
+              };
+      // Only the identity fields enter CustomerService; no alias inference or raw text.
+      const normalizedIdentity = {
+        provider: identity.provider,
+        accountId: identity.accountId,
+        providerUserId: identity.providerUserId,
+        identifierType: identity.identifierType,
+      };
+      stage = 'identity';
+      budget();
+      const customer = await new CustomerService(this.db).register(
+        normalizedIdentity,
+      );
+      budget();
+      const record = await this.db.customerMessagingIdentity.findUniqueOrThrow({
+        where: {
+          provider_accountId_providerUserId: {
+            provider: input.provider,
+            accountId: input.accountId,
+            providerUserId: input.senderId,
+          },
+        },
+      });
+      if (record.customerId !== customer.id)
+        throw new Error('Identity ownership mismatch');
+      for (let attempt = 0; ; attempt++) {
+        try {
+          stage = 'transaction';
+          const remaining = budget();
+          if (remaining <= 2000)
+            throw new PreparationLimitError('budget_exceeded');
+          return await this.db.$transaction(
+            async (tx) => {
+              budget();
+              const now = this.now();
+              const events = await tx.$queryRaw<
+                { id: string }[]
+              >`SELECT "id" FROM "WhatsAppEvent" WHERE "id" = ${eventId} AND "leaseToken" = ${token} AND "state" = 'processing' AND "leaseUntil" > ${now} FOR UPDATE`;
+              if (!events.length) throw new PreparationLimitError('lease_lost');
+              const previous = await tx.conversationTurn.findUnique({
+                where: { eventId },
+              });
+              if (previous) {
+                budget();
+                return previous.responseText;
+              }
+              stage = 'session';
+              await tx.conversationSession.createMany({
+                data: [
+                  { messagingIdentityId: record.id, stateData: initialData() },
+                ],
+                skipDuplicates: true,
+              });
+              await tx.$queryRaw`SELECT "id" FROM "ConversationSession" WHERE "messagingIdentityId" = ${record.id}::uuid FOR UPDATE`;
+              const session = await tx.conversationSession.findUniqueOrThrow({
+                where: { messagingIdentityId: record.id },
+              });
+              const lockedSession = {
+                customerId: customer.id,
+                sessionId: session.id,
+                messagingIdentityId: record.id,
+              };
+              stage = 'transition';
+              budget();
+              const parsed = stateDataSchema.safeParse(session.stateData);
+              const context = parsed.success
+                ? { ...session, data: parsed.data }
+                : idle();
+              const checkoutResult = this.checkout
+                ? await checkoutTransition(
+                    context,
+                    input.command,
+                    {
+                      tx,
+                      config: this.checkout,
+                      scope: { customerId: customer.id, sessionId: session.id },
+                      eventId,
+                      now: this.now,
+                      maxQuantity: this.maxQuantity,
+                      lockedSession,
+                      chatId:
+                        typeof (claimed.data as { chatId?: unknown }).chatId ===
+                        'string'
+                          ? (claimed.data as { chatId: string }).chatId
+                          : input.senderId,
+                      ...(typeof (claimed.data as { senderPhone?: unknown })
+                        .senderPhone === 'string'
+                        ? {
+                            recipientPhone: (
+                              claimed.data as { senderPhone: string }
+                            ).senderPhone,
+                          }
+                        : {}),
+                    },
+                    session.requiresRefresh || !parsed.success,
+                  )
+                : null;
+              const result =
+                checkoutResult ??
+                (await transition(
                   context,
                   input.command,
+                  createCatalogServices(tx),
                   {
-                    tx,
-                    config: this.checkout,
-                    scope: { customerId: customer.id, sessionId: session.id },
-                    eventId,
-                    now: this.now,
-                    maxQuantity: this.maxQuantity,
-                    chatId:
-                      typeof (claimed.data as { chatId?: unknown }).chatId ===
-                      'string'
-                        ? (claimed.data as { chatId: string }).chatId
-                        : input.senderId,
-                    ...(typeof (claimed.data as { senderPhone?: unknown })
-                      .senderPhone === 'string'
-                      ? {
-                          recipientPhone: (
-                            claimed.data as { senderPhone: string }
-                          ).senderPhone,
-                        }
-                      : {}),
+                    expired:
+                      now.getTime() - session.lastInteractionAt.getTime() >=
+                      30 * 60 * 1000,
+                    refresh: session.requiresRefresh || !parsed.success,
                   },
-                  session.requiresRefresh || !parsed.success,
-                )
-              : null;
-            const result =
-              checkoutResult ??
-              (await transition(
-                context,
-                input.command,
-                createCatalogServices(tx),
-                {
-                  expired:
-                    now.getTime() - session.lastInteractionAt.getTime() >=
-                    30 * 60 * 1000,
-                  refresh: session.requiresRefresh || !parsed.success,
+                  {
+                    service: new CartService(
+                      tx,
+                      this.maxQuantity,
+                      true,
+                      lockedSession,
+                    ),
+                    scope: { customerId: customer.id, sessionId: session.id },
+                  },
+                ));
+              if (
+                this.checkout &&
+                !checkoutResult &&
+                result.context.state === 'CART_READY'
+              )
+                result.text = result.text.replace(
+                  'Pickup dan pembayaran tersedia pada tahap berikutnya.\n\n',
+                  '',
+                );
+              if (
+                this.checkout &&
+                !checkoutResult &&
+                result.context.state === 'CART_READY'
+              )
+                result.text = result.text.replace(
+                  '1. Edit Keranjang',
+                  '1. Edit Keranjang\n2. Lanjut Checkout',
+                );
+              if (result.text.length > 4096)
+                throw new Error('Conversation response exceeds limit');
+              stage = 'persist';
+              budget();
+              const { data, ...selection } = result.context;
+              const version = session.version + 1;
+              // Never spread the persisted session into an update: only writable context.
+              await tx.conversationSession.update({
+                where: { id: session.id },
+                data: {
+                  state: selection.state,
+                  selectedTenantId: selection.selectedTenantId,
+                  selectedCategoryId: selection.selectedCategoryId,
+                  selectedMenuItemId: selection.selectedMenuItemId,
+                  stateData: data,
+                  version,
+                  requiresRefresh:
+                    input.command.kind === 'help' && session.requiresRefresh,
+                  ...(input.command.kind === 'help'
+                    ? {}
+                    : { lastInteractionAt: now }),
                 },
-                {
-                  service: new CartService(tx, this.maxQuantity),
-                  scope: { customerId: customer.id, sessionId: session.id },
+              });
+              await tx.conversationTurn.create({
+                data: {
+                  eventId,
+                  sessionId: session.id,
+                  sessionVersion: version,
+                  responseText: result.text,
                 },
-              ));
-            if (
-              this.checkout &&
-              !checkoutResult &&
-              result.context.state === 'CART_READY'
-            )
-              result.text = result.text.replace(
-                'Pickup dan pembayaran tersedia pada tahap berikutnya.\n\n',
-                '',
-              );
-            if (
-              this.checkout &&
-              !checkoutResult &&
-              result.context.state === 'CART_READY'
-            )
-              result.text = result.text.replace(
-                '1. Edit Keranjang',
-                '1. Edit Keranjang\n2. Lanjut Checkout',
-              );
-            if (result.text.length > 4096)
-              throw new Error('Conversation response exceeds limit');
-            const { data, ...selection } = result.context;
-            const version = session.version + 1;
-            // Never spread the persisted session into an update: only writable context.
-            await tx.conversationSession.update({
-              where: { id: session.id },
-              data: {
-                state: selection.state,
-                selectedTenantId: selection.selectedTenantId,
-                selectedCategoryId: selection.selectedCategoryId,
-                selectedMenuItemId: selection.selectedMenuItemId,
-                stateData: data,
-                version,
-                requiresRefresh:
-                  input.command.kind === 'help' && session.requiresRefresh,
-                ...(input.command.kind === 'help'
-                  ? {}
-                  : { lastInteractionAt: now }),
-              },
-            });
-            await tx.conversationTurn.create({
-              data: {
-                eventId,
-                sessionId: session.id,
-                sessionVersion: version,
-                responseText: result.text,
-              },
-            });
-            return result.text;
-          },
-          { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
-        );
-      } catch (error) {
-        if (attempt < 2 && isTransactionConflict(error)) continue;
-        throw error;
+              });
+              stage = 'lease';
+              budget();
+              const owned = await tx.whatsAppEvent.findFirst({
+                where: {
+                  id: eventId,
+                  leaseToken: token,
+                  state: 'processing',
+                  leaseUntil: { gt: this.now() },
+                },
+                select: { id: true },
+              });
+              if (!owned) throw new PreparationLimitError('lease_lost');
+              budget();
+              return result.text;
+            },
+            {
+              isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
+              maxWait: 2000,
+              timeout: Math.min(15000, Math.floor(remaining - 2000)),
+            },
+          );
+        } catch (error) {
+          if (attempt < 2 && isTransactionConflict(error)) {
+            budget();
+            continue;
+          }
+          throw error;
+        }
       }
+    } catch (error) {
+      recordPreparationFailure(error, stage, performance.now() - started);
+      throw error;
     }
   }
 }

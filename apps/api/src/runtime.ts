@@ -1,3 +1,4 @@
+import type { PreparationLogger } from './modules/conversation/diagnostics.js';
 import type { AppDependencies } from './app.js';
 import type { Config } from './config.js';
 import type {
@@ -25,7 +26,7 @@ export function createBackgroundRuntime(
   config: Config,
   database: Database,
   dependencies: AppDependencies = {},
-  warn: (event: string) => void = () => {},
+  warn: PreparationLogger = () => {},
 ) {
   const prisma = (database as Partial<ApplicationDatabase>).prisma;
   if (config.conversationEnabled && !prisma)

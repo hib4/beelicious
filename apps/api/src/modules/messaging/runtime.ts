@@ -1,3 +1,4 @@
+import { type PreparationLogger } from '../conversation/diagnostics.js';
 import type { ConversationHandler } from '../conversation/engine.js';
 import type { WhatsAppEventStore } from '@beelicious/database';
 import type { MessagingConfig } from '../../config.js';
@@ -19,7 +20,7 @@ export function createMessagingRuntime(
   config: MessagingConfig,
   store: WhatsAppEventStore,
   development: boolean,
-  warn: (event: string) => void,
+  warn: PreparationLogger,
   dependencies: {
     conversation?: ConversationHandler;
     adapterFactory?: (callbacks: AdapterCallbacks) => Promise<MessagingAdapter>;

@@ -4,6 +4,7 @@ import { Prisma } from '@beelicious/database';
 export class DomainError extends Error {
   constructor(
     readonly code: 'invalid_input' | 'not_found' | 'conflict' | 'unavailable',
+    options?: ErrorOptions,
   ) {
     super(
       {
@@ -12,6 +13,7 @@ export class DomainError extends Error {
         conflict: 'Resource conflict',
         unavailable: 'Service temporarily unavailable',
       }[code],
+      options,
     );
   }
 }
@@ -28,7 +30,7 @@ export async function domainOperation<T>(
         throw new DomainError('conflict');
       if (error.code === 'P2025') throw new DomainError('not_found');
     }
-    throw new DomainError('unavailable');
+    throw new DomainError('unavailable', { cause: error });
   }
 }
 export const idSchema = z.uuid();

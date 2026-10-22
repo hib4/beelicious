@@ -1,3 +1,4 @@
+import { type PreparationLogger } from '../conversation/diagnostics.js';
 import type { ConversationHandler } from '../conversation/engine.js';
 import type { WhatsAppEventStore } from '@beelicious/database';
 import type { WhatsAppConfig } from '../../config.js';
@@ -17,7 +18,7 @@ export function createWorker(
   sender: TextSender,
   config: WhatsAppConfig,
   isDevelopment: boolean,
-  warn: (event: string) => void,
+  warn: PreparationLogger,
   now: () => Date = () => new Date(),
   conversation?: ConversationHandler,
 ): Worker {

@@ -1,3 +1,8 @@
+import { performance } from 'node:perf_hooks';
+import { setTimeout as delay } from 'node:timers/promises';
+import { OrderService } from '../../src/modules/checkout/orders.js';
+import { parseCheckout } from '../../src/modules/checkout/config.js';
+import { preparationDiagnostic } from '../../src/modules/conversation/diagnostics.js';
 import { randomUUID } from 'node:crypto';
 import { afterAll, afterEach, expect, it, vi } from 'vitest';
 import { createDatabase, Prisma, type EventScope } from '@beelicious/database';
@@ -368,7 +373,7 @@ it('rolls back cart work in a caller-owned transaction', async () => {
   const f = await fixture();
   await expect(
     client.$transaction(async (tx) => {
-      await new CartService(tx).addItem(f.scope, f.item.id, 1, 20000);
+      await new CartService(tx, 20, true).addItem(f.scope, f.item.id, 1, 20000);
       throw new Error('rollback fixture');
     }),
   ).rejects.toThrow('rollback fixture');
@@ -824,5 +829,204 @@ it('rolls back cart and session changes when persisting the response intent fail
   expect((await f.session()).state).toBe('CART_ACTION');
   await db.whatsappEvents.finish(claim.id, 'rollback-cart-turn', {
     state: 'completed',
+  });
+});
+
+// Inject hosted-network delay without modifying production tables or relying on a remote account.
+it.each(['slow', 'expired_lease'] as const)(
+  'keeps quantity atomic with checkout enabled: %s',
+  async (scenario) => {
+    const f = await conversation();
+    await f.enterItem();
+    const before = await f.session();
+    const batch = f.events('2');
+    await db.whatsappEvents.receive(batch);
+    const token = `hosted-${scenario}`;
+    const claim = (await db.whatsappEvents.claim(new Date(), token, {
+      provider: 'mock',
+      accountId: f.record.accountId,
+      conversationEnabled: true,
+    }))!;
+    const input = storedIncomingSchema.parse(claim.data).conversation!;
+    const config = parseCheckout({
+      NODE_ENV: 'development',
+      CHECKOUT_ENABLED: 'true',
+      CONVERSATION_ENABLED: 'true',
+    })!;
+    const nested = vi
+      .fn()
+      .mockRejectedValue(new Error('Unexpected nested transaction'));
+    let clock = Date.now();
+    const original = client.$transaction.bind(client);
+    const transaction = vi
+      .spyOn(client, '$transaction')
+      .mockImplementationOnce(((
+        work: (tx: Prisma.TransactionClient) => Promise<unknown>,
+        options: object,
+      ) =>
+        original(async (tx) => {
+          const wrapped = new Proxy(tx, {
+            get(target, key, receiver) {
+              if (key === '$transaction') return nested;
+              if (key === 'cartItem')
+                return new Proxy(target.cartItem, {
+                  get(delegate, method) {
+                    if (method === 'upsert')
+                      return async (
+                        ...args: Parameters<typeof delegate.upsert>
+                      ) => {
+                        const item = await delegate.upsert(...args);
+                        if (scenario === 'slow') await delay(5500);
+                        else clock += 31000;
+                        return item;
+                      };
+                    return Reflect.get(delegate, method);
+                  },
+                });
+              return Reflect.get(target, key, receiver);
+            },
+          });
+          return work(wrapped);
+        }, options)) as typeof client.$transaction);
+    try {
+      const run = new ConversationEngine(
+        client,
+        () => new Date(clock),
+        20,
+        config,
+      ).handleIncomingMessage(claim.id, token, input);
+      if (scenario === 'slow') {
+        expect(await run).toContain('ditambahkan');
+        expect((await f.service.getCart(f.scope))!.items[0]!.quantity).toBe(2);
+        expect((await f.session()).state).toBe('CART_ACTION');
+        expect(
+          await client.conversationTurn.count({ where: { eventId: claim.id } }),
+        ).toBe(1);
+        // Reusing the same event response must not apply the quantity a second time.
+        await new ConversationEngine(client).handleIncomingMessage(
+          claim.id,
+          token,
+          input,
+        );
+        expect((await f.service.getCart(f.scope))!.items[0]!.quantity).toBe(2);
+      } else {
+        await expect(run).rejects.toThrow('Conversation lease lost');
+        expect(await f.service.getCart(f.scope)).toBeNull();
+        expect((await f.session()).version).toBe(before.version);
+        expect((await f.session()).state).toBe('SELECT_QUANTITY');
+        expect(
+          await client.conversationTurn.count({ where: { eventId: claim.id } }),
+        ).toBe(0);
+      }
+      expect(nested).not.toHaveBeenCalled();
+      expect(transaction.mock.calls[0]![1]).toMatchObject({
+        maxWait: 2000,
+        timeout: 15000,
+      });
+    } finally {
+      transaction.mockRestore();
+    }
+    await db.whatsappEvents.finish(claim.id, token, { state: 'completed' });
+  },
+  20000,
+);
+
+it('stops transaction conflict retries at the total preparation budget without changing the cart or session', async () => {
+  const f = await conversation();
+  await f.enterItem();
+  const before = await f.session();
+  await db.whatsappEvents.receive(f.events('2'));
+  const token = 'budget-fixture';
+  const claim = (await db.whatsappEvents.claim(new Date(), token, {
+    provider: 'mock',
+    accountId: f.record.accountId,
+    conversationEnabled: true,
+  }))!;
+  const input = storedIncomingSchema.parse(claim.data).conversation!;
+  let elapsed = 0;
+  const clock = vi.spyOn(performance, 'now').mockImplementation(() => elapsed);
+  const transaction = vi
+    .spyOn(client, '$transaction')
+    .mockImplementation((async () => {
+      elapsed += 10000;
+      throw new Prisma.PrismaClientKnownRequestError(
+        'private conflict details',
+        { code: 'P2034', clientVersion: 'fixture' },
+      );
+    }) as typeof client.$transaction);
+  let failure: unknown;
+  try {
+    await new ConversationEngine(client)
+      .handleIncomingMessage(claim.id, token, input)
+      .catch((error) => {
+        failure = error;
+      });
+    expect(transaction).toHaveBeenCalledTimes(2);
+    expect(preparationDiagnostic(failure)).toMatchObject({
+      category: 'timeout',
+      stage: 'transaction',
+      elapsedMs: 20000,
+    });
+  } finally {
+    transaction.mockRestore();
+    clock.mockRestore();
+  }
+  expect(await f.service.getCart(f.scope)).toBeNull();
+  expect((await f.session()).version).toBe(before.version);
+  expect(
+    await client.conversationTurn.count({ where: { eventId: claim.id } }),
+  ).toBe(0);
+  await db.whatsappEvents.finish(claim.id, token, { state: 'completed' });
+});
+
+it('binds cart and order operations to an existing locked session without opening nested transactions', async () => {
+  const f = await fixture();
+  const config = parseCheckout({
+    NODE_ENV: 'development',
+    CHECKOUT_ENABLED: 'true',
+    CONVERSATION_ENABLED: 'true',
+  })!;
+  const nested = vi
+    .fn()
+    .mockRejectedValue(new Error('Unexpected nested transaction'));
+  await client.$transaction(async (tx) => {
+    const wrapped = new Proxy(tx, {
+      get(target, key, receiver) {
+        return key === '$transaction'
+          ? nested
+          : Reflect.get(target, key, receiver);
+      },
+    });
+    const carts = new CartService(wrapped, 20, true);
+    await carts.addItem(f.scope, f.item.id, 1, 20000);
+    expect(
+      await new OrderService(wrapped, config, () => new Date(), true).current(
+        f.scope,
+      ),
+    ).toBeNull();
+  });
+  expect(nested).not.toHaveBeenCalled();
+  expect((await f.service.getCart(f.scope))!.items[0]!.quantity).toBe(1);
+});
+
+it('rejects another customer scope when reusing an internally verified session lock', async () => {
+  const f = await fixture();
+  const config = parseCheckout({
+    NODE_ENV: 'development',
+    CHECKOUT_ENABLED: 'true',
+    CONVERSATION_ENABLED: 'true',
+  })!;
+  await client.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT "id" FROM "ConversationSession" WHERE "id"=${f.scope.sessionId}::uuid FOR UPDATE`;
+    const locked = { ...f.scope, messagingIdentityId: f.record.id };
+    const other = { ...f.scope, customerId: randomUUID() };
+    await expect(
+      new CartService(tx, 20, true, locked).getCart(other),
+    ).rejects.toMatchObject({ reason: 'missing' });
+    await expect(
+      new OrderService(tx, config, () => new Date(), true, locked).current(
+        other,
+      ),
+    ).rejects.toMatchObject({ code: 'not_found' });
   });
 });

@@ -74,11 +74,18 @@ export interface CartSummary {
 }
 export type CartResult = { cart: CartSummary; proposal?: PriceProposal };
 
+/** Internal proof supplied only after the enclosing transaction locks this session. */
+export interface LockedCartSession extends CartScope {
+  messagingIdentityId: string;
+}
+
 /** Accepts a caller-owned transaction so cart/session/response commits are atomic. */
 export class CartService {
   constructor(
     private readonly db: PrismaClient | Transaction,
     readonly maxQuantity = 20,
+    private readonly transactionBound = false,
+    private readonly lockedSession?: LockedCartSession,
   ) {
     z.number().int().min(1).max(1000).parse(maxQuantity);
   }
@@ -90,6 +97,15 @@ export class CartService {
     if (!parsedScope.success) throw new DomainError('invalid_input');
     const scope = parsedScope.data;
     const work = async (tx: Transaction) => {
+      if (this.lockedSession) {
+        if (
+          !this.transactionBound ||
+          this.lockedSession.sessionId !== scope.sessionId ||
+          this.lockedSession.customerId !== scope.customerId
+        )
+          throw new CartError('missing');
+        return operation(tx, this.lockedSession.messagingIdentityId);
+      }
       const rows = await tx.$queryRaw<
         { messagingIdentityId: string }[]
       >`SELECT s."messagingIdentityId" FROM "ConversationSession" s JOIN "CustomerMessagingIdentity" i ON i."id" = s."messagingIdentityId" WHERE s."id" = ${scope.sessionId}::uuid AND i."customerId" = ${scope.customerId}::uuid FOR UPDATE OF s`;
@@ -97,7 +113,8 @@ export class CartService {
       return operation(tx, rows[0].messagingIdentityId);
     };
     try {
-      if (!('$transaction' in this.db)) return await work(this.db);
+      if (this.transactionBound || !('$transaction' in this.db))
+        return await work(this.db as Transaction);
       for (let attempt = 0; ; attempt++) {
         try {
           return await this.db.$transaction(work, {
@@ -116,11 +133,14 @@ export class CartService {
       }
     } catch (error) {
       // Serialization must reach the caller-owned engine transaction retry boundary.
-      if (isTransactionConflict(error) && !('$transaction' in this.db))
+      if (
+        isTransactionConflict(error) &&
+        (this.transactionBound || !('$transaction' in this.db))
+      )
         throw error;
       if (error instanceof DomainError) throw error;
       if (error instanceof z.ZodError) throw new DomainError('invalid_input');
-      throw new DomainError('unavailable');
+      throw new DomainError('unavailable', { cause: error });
     }
   }
   private async load(tx: Transaction, scope: CartScope) {
