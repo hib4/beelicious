@@ -1,0 +1,200 @@
+<template>
+  <style>
+    @font-face { font-family: "Plus Jakarta Sans"; src: url("assets/fonts/plus-jakarta-sans.woff2") format("woff2"); font-weight: 200 800; font-display: block; }
+    @font-face { font-family: "Inter"; src: url("assets/fonts/inter.woff2") format("woff2"); font-weight: 100 900; font-display: block; }
+    #root { position: absolute; inset: 0; overflow: hidden; background: #FDC43D; }
+    /* the student's phone: a WhatsApp-familiar chat (no WhatsApp logo or name) */
+    #ph { position: absolute; left: 1056px; top: 40px; width: 768px; height: 1000px; border: 10px solid #1D1B1B; border-radius: 44px; overflow: hidden; background: #EFEAE2; }
+    #ph .hd { position: absolute; left: 0; top: 0; width: 748px; height: 104px; background: #FFFFFF; border-bottom: 1px solid #E9EDEF; }
+    #ph .bk { position: absolute; left: 14px; top: 34px; width: 36px; height: 36px; }
+    #ph .av { position: absolute; left: 60px; top: 22px; width: 60px; height: 60px; border-radius: 50%; background: #FDC43D; display: flex; align-items: center; justify-content: center; }
+    #ph .av img { width: 38px; height: 38px; }
+    #ph .nm { position: absolute; left: 138px; top: 14px; font: 600 32px/40px "Inter"; color: #111B21; }
+    #ph .st { position: absolute; left: 138px; top: 56px; font: 400 24px/30px "Inter"; color: #667781; }
+    #ph .ar { position: absolute; left: 0; top: 104px; width: 748px; height: 772px; overflow: hidden; }
+    #ph .trk { position: absolute; left: 0; top: 0; width: 748px; height: 4000px; }
+    .m { position: absolute; font: 400 28px/38px "Inter"; color: #111B21; letter-spacing: -0.003em; }
+    .mi { left: 20px; background: #FFFFFF; border-radius: 4px 14px 14px 14px; padding: 12px 18px 34px; min-width: 150px; }
+    .m .l { position: relative; display: block; height: 38px; white-space: nowrap; }
+    .m .s { display: block; height: 12px; }
+    .m b { font-weight: 700; }
+    .mi .tm { position: absolute; right: 14px; bottom: 6px; font: 400 20px/24px "Inter"; color: #667781; }
+    .mimg { padding: 6px 6px 34px; }
+    .mimg .img { position: relative; width: 560px; height: 560px; border-radius: 10px; background: #FFFFFF; outline: 1px solid #E9EDEF; }
+    .mimg .img svg { position: absolute; left: 40px; top: 40px; }
+    .mimg .cap { padding: 10px 12px 0; }
+    .mo { right: 20px; height: 62px; background: #D9FDD3; border-radius: 14px 4px 14px 14px; padding: 12px 14px 12px 22px; display: flex; align-items: flex-end; gap: 14px; }
+    .mo .tx { font: 400 30px/38px "Inter"; }
+    .mo .tm { position: relative; display: flex; align-items: center; gap: 4px; margin-bottom: 1px; font: 400 20px/24px "Inter"; color: #667781; }
+    .mo .tk { width: 26px; height: 16px; }
+    .mo .tk.bl { position: absolute; right: 0; top: 4px; opacity: 0; }
+    .dc { left: 304px; width: 140px; height: 44px; border-radius: 10px; background: #FFFFFF; font: 500 22px/44px "Inter"; color: #54656F; text-align: center; }
+    .mk { position: absolute; left: -6px; right: -6px; top: 3px; bottom: 3px; border-radius: 6px; background: rgba(253, 196, 61, 0.7); transform-origin: 0% 50%; }
+    .hl { position: relative; display: inline-block; }
+    .hl .mk { left: -4px; right: -4px; }
+    .t { position: relative; }
+    .em { width: 1.1em; height: 1.1em; vertical-align: -0.2em; }
+    .ty { left: 20px; width: 104px; height: 58px; background: #FFFFFF; border-radius: 4px 14px 14px 14px; opacity: 0; }
+    .ty i { position: absolute; top: 23px; width: 12px; height: 12px; border-radius: 50%; background: #8696A0; }
+    .ty i:nth-child(1) { left: 26px; } .ty i:nth-child(2) { left: 46px; } .ty i:nth-child(3) { left: 66px; }
+    #ph .ib { position: absolute; left: 0; bottom: 0; width: 748px; height: 104px; background: #F0F2F5; }
+    #ph .pill { position: absolute; left: 16px; top: 14px; width: 620px; height: 76px; border-radius: 38px; background: #FFFFFF; }
+    #ph .phd { position: absolute; left: 32px; top: 19px; font: 400 28px/38px "Inter"; color: #8696A0; }
+    #ph .in { position: absolute; left: 32px; top: 18px; font: 400 30px/40px "Inter"; color: #111B21; opacity: 0; }
+    #ph .snd { position: absolute; left: 652px; top: 14px; width: 76px; height: 76px; border-radius: 50%; background: #00A884; display: flex; align-items: center; justify-content: center; }
+    /* the step, named in the film's editorial type */
+    .co { position: absolute; left: 96px; top: 236px; width: 900px; margin: 0; font: 800 128px/0.92 "Plus Jakarta Sans"; letter-spacing: -0.045em; color: #1D1B1B; opacity: 0; }
+    .re { position: absolute; left: 96px; top: 548px; display: flex; align-items: center; gap: 26px; opacity: 0; }
+    .re .chip { width: 104px; height: 104px; border-radius: 22px; background: #1D1B1B; color: #FDC43D; font: 800 68px/104px "Plus Jakarta Sans"; text-align: center; flex: none; }
+    .re .v { margin: 0; font: 800 66px/1.02 "Plus Jakarta Sans"; letter-spacing: -0.035em; color: #1D1B1B; white-space: nowrap; }
+    .re .v .p { color: #5A4A1A; }
+    #ph { z-index: 2; }
+    #t8, #t9, #t10 { top: 200px; }
+    .ord { position: absolute; left: 96px; top: 470px; margin: 0; font: 800 92px/0.98 "Plus Jakarta Sans"; letter-spacing: -0.035em; color: #1D1B1B; }
+    .ord .c { opacity: 0; }
+    #tot { position: absolute; left: 70px; top: 330px; margin: 0; white-space: nowrap; font: 800 204px/0.9 "Plus Jakarta Sans"; letter-spacing: -0.055em; color: #1D1B1B; opacity: 0; font-variant-numeric: tabular-nums; }
+    .sub { position: absolute; left: 96px; top: 470px; width: 860px; margin: 0; font: 600 44px/1.25 "Inter"; color: #1D1B1B; opacity: 0; }
+    #ok { position: absolute; left: 96px; top: 40px; opacity: 0; }
+    #s10 { top: 500px; }
+    #pan { position: absolute; inset: 0; background: #FFFBF3; clip-path: inset(0% 0% 0% 100%); z-index: 1; }
+  </style>
+  <div id="root" data-composition-id="bayar" data-width="1920" data-height="1080">
+    <h2 class="co" id="t8">Pesanan<br />dibuat</h2>
+    <p id="ord" class="ord"><span class="w">BEE-20261125-</span><br /><span class="w">3F9A1C2B</span></p>
+    <div id="tot" data-layout-allow-overflow>Rp60.000</div>
+    <h2 class="co" id="t9">Bayar<br />QRIS</h2>
+    <p class="sub" id="s9">Simpan gambar QR, lalu bayar dari aplikasi pembayaran.</p>
+    <h2 class="co" id="t10">Pembayaran<br />terverifikasi</h2>
+    <div id="ok"><svg width="150" height="150" viewBox="0 0 220 220"><circle cx="110" cy="110" r="104" fill="#1D1B1B"/><path id="okc" d="M62 114 L96 148 L160 80" fill="none" stroke="#FDC43D" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <p class="sub" id="s10">“Pesanan belum dinyatakan siap diambil.”</p>
+    <div id="ph" role="img" aria-label="Percakapan WhatsApp pelanggan dengan Beelicious">
+      <div class="hd">
+        <svg class="bk" viewBox="0 0 24 24"><path d="M15 5 L8 12 L15 19" fill="none" stroke="#54656F" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="av"><img src="assets/emoji/1f41d.svg" alt=""></div>
+        <div class="nm">Beelicious</div><div class="st">online</div>
+      </div>
+      <div class="ar"><div class="trk" data-layout-allow-overflow>
+        <div class="m mi" id="b6"><span class="l"><img class="em" src="assets/emoji/2705.svg" alt=""> Pilihan tersimpan.</span><span class="s"></span><span class="l"><img class="em" src="assets/emoji/1f41d.svg" alt=""> Pilih Waktu Pickup</span><span class="s"></span><span class="l"><img class="em" src="assets/emoji/1f3ea.svg" alt=""> Bakmi Effata</span><span class="s"></span><span class="l"><i class="mk"></i><span class="t">1. 25 Nov, 12.30 WIB</span></span><span class="l">2. 25 Nov, 13.00 WIB</span><span class="l">3. 25 Nov, 13.30 WIB</span><span class="l">4. 25 Nov, 14.00 WIB</span><span class="l">5. 25 Nov, 14.30 WIB</span><span class="s"></span><span class="l">9. Berikutnya</span><span class="l">Balas nomor waktu yang diinginkan.</span><span class="l">0. Kembali</span><span class="tm">11.05</span></div>
+        <div class="m mo" id="o6"><span class="tx">1</span><span class="tm">11.05<svg class="tk g" viewBox="0 0 26 16"><path d="M1 8.5 L5 12.5 L13 3.5 M9 12.5 L17 3.5 M13.5 12.5" fill="none" stroke="#8696A0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><svg class="tk bl" viewBox="0 0 26 16"><path d="M1 8.5 L5 12.5 L13 3.5 M9 12.5 L17 3.5" fill="none" stroke="#53BDEB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
+        <div class="m mi" id="b7"><span class="l"><img class="em" src="assets/emoji/1f9fe.svg" alt=""> Konfirmasi Pesanan</span><span class="s"></span><span class="l"><img class="em" src="assets/emoji/1f3ea.svg" alt=""> Bakmi Effata</span><span class="l">Pickup: 25 Nov, 12.30 WIB</span><span class="s"></span><span class="l">2x Bakmi Ayam Pangsit</span><span class="l">Rp30.000 / item</span><span class="l">Subtotal item: Rp60.000</span><span class="s"></span><span class="l">Halaman 1/1</span><span class="l">Subtotal: Rp60.000</span><span class="l">Total: Rp60.000</span><span class="s"></span><span class="l"><i class="mk"></i><span class="t">1. Konfirmasi &amp; Bayar</span></span><span class="l">2. Ubah Waktu</span><span class="l">0. Kembali</span><span class="tm">11.05</span></div>
+        <div class="m mo" id="o7"><span class="tx">1</span><span class="tm">11.05<svg class="tk g" viewBox="0 0 26 16"><path d="M1 8.5 L5 12.5 L13 3.5 M9 12.5 L17 3.5 M13.5 12.5" fill="none" stroke="#8696A0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><svg class="tk bl" viewBox="0 0 26 16"><path d="M1 8.5 L5 12.5 L13 3.5 M9 12.5 L17 3.5" fill="none" stroke="#53BDEB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span></div>
+        <div class="m mi" id="b8"><span class="l"><img class="em" src="assets/emoji/1f9fe.svg" alt=""> Pesanan BEE-20261125-3F9A1C2B</span><span class="l">dibuat.</span><span class="l"><i class="mk"></i><span class="t">Total: Rp60.000</span></span><span class="s"></span><span class="l">QR pembayaran segera dikirim.</span><span class="s"></span><span class="l"><b>CEK</b> — Periksa pembayaran</span><span class="l"><b>BATAL</b> — Minta pembatalan</span><span class="tm">11.05</span></div>
+        <div class="m mi mimg" id="b9"><div class="img"><svg id="qr-svg" width="480" height="480" viewBox="0 0 29 29" shape-rendering="crispEdges"></svg></div><div class="cap"><span class="l"><b>Pembayaran QRIS</b></span><span class="s"></span><span class="l">Pesanan: BEE-20261125-3F9A1C2B</span><span class="l">Total: Rp60.000</span><span class="l">Batas pembayaran: 25 Nov, 11.20 WIB</span><span class="s"></span><span class="l">Simpan gambar QRIS, lalu pilih</span><span class="l">pindai/impor gambar di aplikasi</span><span class="l">pembayaran yang mendukung.</span><span class="s"></span><span class="l"><b>CEK</b> — Periksa pembayaran</span><span class="l"><b>BATAL</b> — Minta pembatalan</span><span class="l"><b>Kirim Ulang QR</b> — Kirim gambar</span><span class="l">yang sama</span></div><span class="tm">11.05</span></div>
+        <div class="m mi" id="b10"><span class="l"><img class="em" src="assets/emoji/2705.svg" alt=""> Pembayaran terverifikasi</span><span class="s"></span><span class="l">Pesanan: BEE-20261125-3F9A1C2B</span><span class="l">Tenant: Bakmi Effata</span><span class="l">Pickup: 25 Nov, 12.30 WIB</span><span class="l">Dibayar: Rp60.000</span><span class="l">Status: Pembayaran diterima</span><span class="s"></span><span class="l"><i class="mk"></i><span class="t">Persiapan oleh tenant belum</span></span><span class="l"><i class="mk"></i><span class="t">dikonfirmasi. Pesanan belum</span></span><span class="l"><i class="mk"></i><span class="t">dinyatakan siap diambil.</span></span><span class="s"></span><span class="l"><b>Menu</b> — Pesan lagi</span><span class="l"><b>Keranjang</b> — Lihat keranjang</span><span class="l"><b>CEK</b> — Lihat status pesanan</span><span class="l"><b>Bantuan</b> — Lihat panduan</span><span class="tm">11.07</span></div>
+        <div class="m ty" id="ty"><i></i><i></i><i></i></div>
+      </div></div>
+      <div class="ib">
+        <div class="pill"><span class="phd" id="phd">Ketik pesan</span></div>
+        <div class="snd" id="snd"><svg width="40" height="40" viewBox="0 0 24 24"><path d="M4 12 L20 4 L14 20 L11.5 13 Z" fill="#FFFFFF"/></svg></div>
+      </div>
+    </div>
+    <div id="pan"></div>
+  </div>
+  <script>
+    (function () {
+      const B = 0.4651; // 129 BPM
+      const tl = gsap.timeline({ paused: true });
+      // Static layout from line counts (no DOM measurement): bubble = 12 + 38·lines + 12·blank + 34 (time row).
+      const T = {};
+      (function layout() {
+        let y = 16;
+        document.querySelectorAll("#ph .trk > .m:not(.ty)").forEach((el) => {
+          const nl = el.querySelectorAll(".l").length, ns = el.querySelectorAll(".s").length;
+          let h = 12 + 38 * nl + 12 * ns + 34;
+          if (el.classList.contains("mo")) h = 62;
+          if (el.classList.contains("dc")) h = 44;
+          if (el.classList.contains("mimg")) h += 564;
+          el.style.top = y + "px";
+          T[el.id] = { top: y, bottom: y + h, h };
+          y += h + 14;
+        });
+      })();
+      const AREA = 772;
+      const fit = (id) => Math.min(0, AREA - 16 - T[id].bottom);          // newest message's bottom above the input bar
+      const fitTop = (id) => Math.min(0, 16 - T[id].top);                 // a tall message: its top
+      const fitTyping = (id) => Math.min(0, AREA - 16 - (T[id].top + 58)); // the typing dots where the message will appear
+      gsap.set("#ph .mk", { scaleX: 0 });
+      // the bot is typing, then its message arrives
+      const botSays = (id, at, view) => {
+        tl.set("#ty", { top: T[id].top, opacity: 1 }, at - 0.42);
+        tl.to("#ph .trk", { y: fitTyping(id), duration: 0.3, ease: "power3.inOut" }, at - 0.44);
+        tl.fromTo("#ty i", { y: 0 }, { y: -7, duration: 0.1, ease: "sine.inOut", yoyo: true, repeat: 1, stagger: 0.07, immediateRender: false }, at - 0.4);
+        tl.set("#ty", { opacity: 0 }, at);
+        tl.fromTo("#" + id, { opacity: 0, scale: 0.92, transformOrigin: "0% 100%" }, { opacity: 1, scale: 1, duration: 0.18, ease: "back.out(1.6)", immediateRender: false }, at);
+        tl.to("#ph .trk", { y: view === undefined ? fit(id) : view, duration: 0.32, ease: "power3.inOut" }, at);
+      };
+      // the student types the number and sends it
+      const iSend = (inId, outId, at) => {
+        tl.set("#phd", { opacity: 0 }, at - 0.32);
+        tl.set("#" + inId, { opacity: 1 }, at - 0.32);
+        tl.to("#snd", { scale: 0.88, duration: 0.08, ease: "power2.in" }, at - 0.1);
+        tl.to("#snd", { scale: 1, duration: 0.16, ease: "power2.out" }, at - 0.02);
+        tl.set("#" + inId, { opacity: 0 }, at);
+        tl.set("#phd", { opacity: 1 }, at);
+        tl.fromTo("#" + outId, { opacity: 0, y: 46, scale: 0.94, transformOrigin: "100% 100%" }, { opacity: 1, y: 0, scale: 1, duration: 0.22, ease: "power3.out", immediateRender: false }, at);
+        tl.to("#ph .trk", { y: fit(outId), duration: 0.3, ease: "power3.inOut" }, at);
+        tl.to("#" + outId + " .tk.bl", { opacity: 1, duration: 0.1, ease: "none" }, at + 0.35);
+      };
+      const mark = (sel, at) => tl.to(sel, { scaleX: 1, duration: 0.24, ease: "expo.out" }, at);
+      const titleIn = (sel, at) => tl.fromTo(sel, { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.15, ease: "power4.out", immediateRender: false }, at);
+      const out = (sel, at) => tl.to(sel, { opacity: 0, filter: "blur(10px)", duration: 0.12, ease: "power3.in" }, at);
+
+      // the QR art: three finder squares and a seeded pattern; not a scannable code
+      (function () {
+        const N = 29; let seed = 1125;
+        const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
+        const inF = (x, y) => (x < 7 && y < 7) || (x >= N - 7 && y < 7) || (x < 7 && y >= N - 7);
+        const fOn = (x, y) => { const fx = x >= N - 7 ? x - (N - 7) : x, fy = y >= N - 7 ? y - (N - 7) : y; return Math.max(Math.abs(fx - 3), Math.abs(fy - 3)) !== 2; };
+        const sep = (x, y) => (x <= 7 && y <= 7) || (x >= N - 8 && y <= 7) || (x <= 7 && y >= N - 8);
+        let s = "";
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+          const on = inF(x, y) ? fOn(x, y) : sep(x, y) ? false : rnd() < 0.5;
+          if (on) s += '<rect class="qm" x="' + x + '" y="' + y + '" width="1" height="1" fill="#1D1B1B"/>';
+        }
+        document.getElementById("qr-svg").innerHTML = s;
+        document.querySelectorAll("#ord .w").forEach((w) => { w.innerHTML = [...w.textContent].map((ch) => '<span class="c">' + ch + "</span>").join(""); });
+      })();
+      gsap.set(["#b8", "#b9", "#b10"], { opacity: 0 });
+      gsap.set(["#b6 .mk", "#b7 .mk"], { scaleX: 1 });
+      gsap.set(["#o6 .tk.bl", "#o7 .tk.bl"], { opacity: 1 });
+      gsap.set(".qm", { opacity: 0 });
+      gsap.set("#okc", { strokeDasharray: 190, strokeDashoffset: 190 });
+      gsap.set("#ph .trk", { y: fit("o7") });
+
+      // beats 0–10: the order exists; its number is typed out; the total is marked
+      botSays("b8", 0.42);
+      titleIn("#t8", 0.47);
+      document.querySelectorAll("#ord .c").forEach((el, i) => tl.set(el, { opacity: 1 }, 2 * B + i * 0.07));
+      mark("#b8 .mk", 7 * B);
+      // beat 11: one beat of silence; beat 12 (the drop): the total
+      out(["#t8", "#ord"], 11 * B - 0.12);
+      const PAY = 12 * B;
+      tl.fromTo("#tot", { opacity: 0, scale: 1.22, filter: "blur(14px)", transformOrigin: "0% 60%" }, { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.18, ease: "expo.out", immediateRender: false }, PAY);
+      tl.fromTo("#tot", { x: 0 }, { keyframes: [{ x: -10, duration: 1 / 60 }, { x: 9, duration: 1 / 60 }, { x: -5, duration: 1 / 60 }, { x: 0, duration: 1 / 60 }], immediateRender: false }, PAY + 0.02);
+      // beat 15: the QRIS image arrives in the chat
+      const Q = 15 * B;
+      tl.to("#tot", { x: -1100, filter: "blur(18px)", duration: 0.24, ease: "power3.in" }, Q - 0.24);
+      botSays("b9", Q + 0.1, fitTop("b9"));
+      titleIn("#t9", Q + 0.1);
+      titleIn("#s9", Q + 0.3);
+      tl.to(".qm", { opacity: 1, duration: 0.05, ease: "none", stagger: { each: 0.0012, grid: [29, 29], from: "center" } }, Q + 0.25);
+      tl.to("#ph .trk", { y: fit("b9"), duration: 0.6, ease: "power2.inOut" }, 18 * B);
+      // beat 20: paid — the verification arrives
+      const V = 20 * B;
+      out(["#t9", "#s9"], V - 0.3);
+      botSays("b10", V);
+      titleIn(["#t10", "#ok"], V + 0.05);
+      tl.to("#okc", { strokeDashoffset: 0, duration: 0.3, ease: "power2.out" }, V + 0.15);
+      mark("#b10 .mk", V + 2 * B);
+      titleIn("#s10", V + 2 * B + 0.1);
+      // the end: the camera pans from the student's phone to the merchant — the phone leaves left,
+      // parchment (the dashboard's ground) sweeps in from the right; dapur continues the same move
+      const PAN = 28 * B - 0.6;
+      out(["#t10", "#ok", "#s10"], PAN - 0.12);
+      tl.to("#ph", { x: -1700, duration: 0.6, ease: "power3.in" }, PAN);
+      tl.to("#pan", { clipPath: "inset(0% 0% 0% 0%)", duration: 0.6, ease: "power3.in" }, PAN);
+      window.__timelines = window.__timelines || {};
+      window.__timelines["bayar"] = tl;
+    })();
+  </script>
+</template>

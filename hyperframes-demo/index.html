@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Beelicious — Satu Pesanan</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #FDC43D; }
+      #root { position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+    </style>
+  </head>
+  <body>
+    <!-- Beelicious · "Satu Pesanan" — product demo. 124 beats at 129 BPM (1 beat = 0.4651 s).
+         One order: chat → pickup → QRIS → merchant dashboard → notifications → pickup at 12.30.
+         Rp60.000 lands on the track's drop (beat 64) after one beat of silence; the end card arrives on the track's final hit. -->
+    <div id="root" data-composition-id="main" data-start="0" data-duration="57.6724" data-fps="60" data-width="1920" data-height="1080">
+      <div id="hook" class="clip" data-composition-id="hook" data-composition-src="compositions/hook.html" data-start="0" data-duration="3.7208" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="chat" class="clip" data-composition-id="chat" data-composition-src="compositions/chat.html" data-start="3.7208" data-duration="13.953" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="pickup" class="clip" data-composition-id="pickup" data-composition-src="compositions/pickup.html" data-start="17.6738" data-duration="6.5114" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="bayar" class="clip" data-composition-id="bayar" data-composition-src="compositions/bayar.html" data-start="24.1852" data-duration="13.0228" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="dapur" class="clip" data-composition-id="dapur" data-composition-src="compositions/dapur.html" data-start="37.208" data-duration="9.302" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="notif" class="clip" data-composition-id="notif" data-composition-src="compositions/notif.html" data-start="46.51" data-duration="2.7906" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="ambil" class="clip" data-composition-id="ambil" data-composition-src="compositions/ambil.html" data-start="49.3006" data-duration="4.651" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="akhir" class="clip" data-composition-id="akhir" data-composition-src="compositions/akhir.html" data-start="53.9516" data-duration="3.7208" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+
+      <!-- music: "Digital Clouds" (Pixabay), bars 0–26 then the ending from bar 49, spliced on a bar line -->
+      <audio id="bgm" src="assets/audio/bed.wav" data-start="0" data-duration="57.6724" data-track-index="2" data-volume="1"
+        data-automation='{"version":1,"lanes":[{"target":"volume","points":[{"t":0,"v":1},{"t":29.28,"v":1},{"t":29.3,"v":0},{"t":29.745,"v":0},{"t":29.766,"v":1},{"t":57.6724,"v":1}]}]}'></audio>
+
+      <!-- hook: typing, send, the message becomes the world -->
+      <audio id="sx-h1" src="assets/sfx/tick.mp3" data-start="1.187" data-duration="0.238" data-track-index="3" data-volume="0.45"></audio>
+      <audio id="sx-h2" src="assets/sfx/tick.mp3" data-start="1.307" data-duration="0.238" data-track-index="6" data-volume="0.4"></audio>
+      <audio id="sx-h3" src="assets/sfx/tick.mp3" data-start="1.427" data-duration="0.238" data-track-index="3" data-volume="0.45"></audio>
+      <audio id="sx-h4" src="assets/sfx/tick.mp3" data-start="1.547" data-duration="0.238" data-track-index="6" data-volume="0.4"></audio>
+      <audio id="sx-send" src="assets/sfx/pop.mp3" data-start="1.778" data-duration="0.2" data-track-index="3" data-volume="0.5"></audio>
+      <audio id="sx-w1" src="assets/sfx/whoosh.mp3" data-start="3.33" data-duration="0.489" data-track-index="3" data-volume="0.4"></audio>
+      <!-- chat: each numeric reply -->
+      <audio id="sx-r1" src="assets/sfx/key.mp3" data-start="5.521" data-duration="0.4" data-track-index="3" data-volume="0.6"></audio>
+      <audio id="sx-r2" src="assets/sfx/key.mp3" data-start="7.847" data-duration="0.4" data-track-index="3" data-volume="0.55"></audio>
+      <audio id="sx-r3" src="assets/sfx/key.mp3" data-start="10.638" data-duration="0.4" data-track-index="3" data-volume="0.6"></audio>
+      <audio id="sx-r4" src="assets/sfx/key.mp3" data-start="13.429" data-duration="0.4" data-track-index="3" data-volume="0.55"></audio>
+      <audio id="sx-r5" src="assets/sfx/key.mp3" data-start="16.219" data-duration="0.4" data-track-index="3" data-volume="0.6"></audio>
+      <audio id="sx-w2" src="assets/sfx/whoosh.mp3" data-start="17.47" data-duration="0.489" data-track-index="3" data-volume="0.35"></audio>
+      <!-- pickup -->
+      <audio id="sx-r6" src="assets/sfx/key.mp3" data-start="19.474" data-duration="0.4" data-track-index="3" data-volume="0.6"></audio>
+      <audio id="sx-r7" src="assets/sfx/key.mp3" data-start="22.73" data-duration="0.4" data-track-index="3" data-volume="0.55"></audio>
+      <audio id="sx-w3" src="assets/sfx/whoosh.mp3" data-start="23.8" data-duration="0.489" data-track-index="3" data-volume="0.4"></audio>
+      <!-- payment: riser, one beat of silence, the total on the drop -->
+      <audio id="sx-riser" src="assets/sfx/riser.mp3" data-start="25.829" data-duration="3.47" data-track-index="4" data-volume="0.5" data-fade-in="0.8"></audio>
+      <audio id="sx-impact" src="assets/sfx/impact.mp3" data-start="29.682" data-duration="2.2" data-track-index="5" data-volume="0.8" data-fade-out="0.6"></audio>
+      <audio id="sx-w4" src="assets/sfx/whoosh.mp3" data-start="30.97" data-duration="0.489" data-track-index="3" data-volume="0.35"></audio>
+      <audio id="sx-paid" src="assets/sfx/pop.mp3" data-start="33.405" data-duration="0.2" data-track-index="3" data-volume="0.55"></audio>
+      <audio id="sx-w5" src="assets/sfx/whoosh.mp3" data-start="36.85" data-duration="0.489" data-track-index="3" data-volume="0.4"></audio>
+      <!-- merchant: real clicks and each notification -->
+      <audio id="sx-land" src="assets/sfx/tick.mp3" data-start="37.775" data-duration="0.238" data-track-index="3" data-volume="0.5"></audio>
+      <audio id="sx-c1" src="assets/sfx/key.mp3" data-start="40.504" data-duration="0.4" data-track-index="3" data-volume="0.5"></audio>
+      <audio id="sx-w6" src="assets/sfx/whoosh.mp3" data-start="40.62" data-duration="0.489" data-track-index="6" data-volume="0.3"></audio>
+      <audio id="sx-c2" src="assets/sfx/key.mp3" data-start="41.434" data-duration="0.4" data-track-index="3" data-volume="0.5"></audio>
+      <audio id="sx-c3" src="assets/sfx/key.mp3" data-start="42.234" data-duration="0.4" data-track-index="3" data-volume="0.5"></audio>
+      <audio id="sx-n1" src="assets/sfx/pop.mp3" data-start="42.612" data-duration="0.2" data-track-index="6" data-volume="0.5"></audio>
+      <audio id="sx-c4" src="assets/sfx/key.mp3" data-start="42.829" data-duration="0.4" data-track-index="3" data-volume="0.5"></audio>
+      <audio id="sx-c5" src="assets/sfx/key.mp3" data-start="43.389" data-duration="0.4" data-track-index="3" data-volume="0.5"></audio>
+      <audio id="sx-n2" src="assets/sfx/pop.mp3" data-start="43.767" data-duration="0.2" data-track-index="6" data-volume="0.5"></audio>
+      <audio id="sx-c6" src="assets/sfx/key.mp3" data-start="44.225" data-duration="0.4" data-track-index="3" data-volume="0.5"></audio>
+      <audio id="sx-c7" src="assets/sfx/key.mp3" data-start="44.785" data-duration="0.4" data-track-index="3" data-volume="0.5"></audio>
+      <audio id="sx-n3" src="assets/sfx/pop.mp3" data-start="45.163" data-duration="0.2" data-track-index="6" data-volume="0.55"></audio>
+      <audio id="sx-w7" src="assets/sfx/whoosh.mp3" data-start="46.0" data-duration="0.489" data-track-index="3" data-volume="0.35"></audio>
+      <!-- ready, match cut, collected, end -->
+      <audio id="sx-mark" src="assets/sfx/tick.mp3" data-start="47.922" data-duration="0.238" data-track-index="3" data-volume="0.5"></audio>
+      <audio id="sx-w8" src="assets/sfx/whoosh.mp3" data-start="48.85" data-duration="0.489" data-track-index="3" data-volume="0.4"></audio>
+      <audio id="sx-c8" src="assets/sfx/key.mp3" data-start="50.736" data-duration="0.4" data-track-index="3" data-volume="0.5"></audio>
+      <audio id="sx-done" src="assets/sfx/pop.mp3" data-start="50.754" data-duration="0.2" data-track-index="6" data-volume="0.5"></audio>
+      <audio id="sx-k1" src="assets/sfx/tick.mp3" data-start="51.843" data-duration="0.238" data-track-index="3" data-volume="0.5"></audio>
+      <audio id="sx-k2" src="assets/sfx/tick.mp3" data-start="52.308" data-duration="0.238" data-track-index="3" data-volume="0.5"></audio>
+      <audio id="sx-w9" src="assets/sfx/whoosh.mp3" data-start="53.7" data-duration="0.489" data-track-index="3" data-volume="0.4"></audio>
+    </div>
+    <script>
+      window.__timelines = window.__timelines || {};
+      window.__timelines["main"] = gsap.timeline({ paused: true });
+    </script>
+  </body>
+</html>

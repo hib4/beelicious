@@ -1,0 +1,318 @@
+<template>
+  <style>
+    @font-face { font-family: "Plus Jakarta Sans"; src: url("assets/fonts/plus-jakarta-sans.woff2") format("woff2"); font-weight: 200 800; font-display: block; }
+    @font-face { font-family: "Inter"; src: url("assets/fonts/inter.woff2") format("woff2"); font-weight: 100 900; font-display: block; }
+    /* tokens from apps/web globals.css + dashboard.css */
+    #root {
+      position: absolute; inset: 0; overflow: hidden; background: #FFFBF3;
+      --bee: #fdc43d; --ink: #1d1b1b; --ivory: #fbefda; --parchment: #fffbf3; --muted: #494038; --hairline: #e6dacb; --white: #ffffff;
+      font: 400 14px/1.5 "Inter"; color: #1d1b1b;
+    }
+    .dash h1, .dash h2 { margin: 0; font-family: "Plus Jakarta Sans"; font-weight: 700; letter-spacing: -0.025em; line-height: 1.3; }
+    .dash h1 { font-size: 28px; }
+    .dash h2 { font-size: 18px; }
+    .dash p { margin: 0; }
+    .dash small { display: block; color: var(--muted); font-size: 12px; }
+    .dash .btn { display: inline-flex; align-items: center; justify-content: center; height: 44px; padding: 0 16px; border: 1px solid var(--hairline); border-radius: 10px; background: var(--white); font: 600 14px/1.4 "Inter"; color: var(--ink); white-space: nowrap; }
+    .dash .btn.primary { background: var(--bee); border-color: var(--bee); border-radius: 9999px; }
+    .dash .chip { display: inline-block; padding: 4px 8px; border-radius: 6px; background: var(--ivory); font-size: 12px; font-weight: 600; line-height: 18px; margin: 0 4px 6px 0; white-space: nowrap; }
+
+    /* the list page at native size, filmed by a camera */
+    #cam { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; }
+    #side { position: absolute; left: 0; top: 0; width: 240px; height: 1080px; padding: 32px 24px; border-right: 1px solid var(--hairline); }
+    #side .brand { font: 800 24px/1 "Plus Jakarta Sans"; letter-spacing: -0.04em; margin-bottom: 20px; }
+    #side .tenant { font-size: 16px; font-weight: 600; }
+    #side nav { display: grid; gap: 4px; margin-top: 32px; }
+    #side nav span { display: flex; align-items: center; height: 44px; padding: 0 12px; border-radius: 10px; }
+    #side nav span.on { background: var(--ivory); font-weight: 600; }
+    #side .acct { position: absolute; left: 24px; right: 24px; bottom: 32px; display: grid; gap: 12px; }
+    #side .acct .btn { width: 100%; }
+    #content { position: absolute; left: 420px; top: 40px; width: 1320px; }
+    .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; }
+    .head p { color: var(--muted); margin-top: 8px; }
+    .filters { display: flex; gap: 16px; margin-bottom: 24px; }
+    .filters label { display: grid; gap: 6px; font-weight: 500; flex: 1 1 150px; }
+    .filters label:first-child { flex: 2 1 200px; }
+    .filters .in { height: 44px; border: 1px solid var(--hairline); border-radius: 10px; background: var(--white); padding: 10px 12px; font-size: 16px; line-height: 24px; font-weight: 400; }
+    .tbl { border: 1px solid var(--hairline); border-radius: 20px; background: var(--white); overflow: hidden; }
+    .tr { display: grid; grid-template-columns: 330px 280px 250px 300px 1fr; border-bottom: 1px solid var(--hairline); }
+    .tr > div { padding: 16px; }
+    .th > div { font-size: 12px; font-weight: 500; color: var(--muted); line-height: 18px; }
+    .th > div:last-child, .row > div:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+    .row { border-bottom: 0; height: 101px; position: relative; }
+    .row .link { font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+    .row small { margin-top: 6px; }
+    .pager { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-top: 16px; color: var(--muted); }
+
+    /* the detail page: its fulfilment field and action panel, lifted out at 2.4x */
+    #split { position: absolute; inset: 0; opacity: 0; }
+    #stk { position: absolute; left: 72px; top: 58px; width: 486px; height: 420px; }
+    #stk-s { position: absolute; left: 0; top: 0; width: 486px; height: 420px; transform: scale(2.4); transform-origin: 0 0; }
+    .dl { position: absolute; left: 0; top: 44px; display: grid; grid-template-columns: 130px 1fr; gap: 12px; align-items: center; }
+    .dl dt { color: var(--muted); }
+    .dl dd { margin: 0; position: relative; height: 26px; width: 200px; }
+    .dl .chip { position: absolute; left: 0; top: 0; margin: 0; }
+    .panel { position: absolute; left: 0; top: 82px; width: 486px; height: 230px; background: var(--white); border: 1px solid var(--hairline); border-radius: 20px; padding: 24px; }
+    .panel h2 { margin-bottom: 20px; }
+    .panel .next { position: relative; height: 21px; }
+    .panel .next p, .panel .acts .btn { position: absolute; left: 0; top: 0; }
+    .panel .acts { position: relative; height: 44px; margin: 16px 0; }
+    .panel .muted { color: var(--muted); }
+    .notice { position: absolute; left: 0; top: 328px; width: 486px; padding: 16px; border: 1px solid var(--hairline); border-radius: 10px; opacity: 0; }
+    #back { position: absolute; left: -40px; top: -40px; width: 600px; height: 520px; background: rgb(29 27 27 / 0.45); opacity: 0; }
+    #dlg { position: absolute; left: 28px; top: 85px; width: 430px; padding: 28px; border: 1px solid var(--hairline); border-radius: 20px; background: var(--parchment); opacity: 0; }
+    #dlg .title { position: relative; height: 23px; margin-bottom: 20px; }
+    #dlg .title h2 { position: absolute; left: 0; top: 0; opacity: 0; }
+    #dlg p { margin-bottom: 20px; }
+    #dlg .acts { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; }
+
+    /* the student's phone: a WhatsApp-familiar chat (no WhatsApp logo or name) */
+    #ph { position: absolute; left: 1056px; top: 40px; width: 768px; height: 1000px; border: 10px solid #1D1B1B; border-radius: 44px; overflow: hidden; background: #EFEAE2; }
+    #ph .hd { position: absolute; left: 0; top: 0; width: 748px; height: 104px; background: #FFFFFF; border-bottom: 1px solid #E9EDEF; }
+    #ph .bk { position: absolute; left: 14px; top: 34px; width: 36px; height: 36px; }
+    #ph .av { position: absolute; left: 60px; top: 22px; width: 60px; height: 60px; border-radius: 50%; background: #FDC43D; display: flex; align-items: center; justify-content: center; }
+    #ph .av img { width: 38px; height: 38px; }
+    #ph .nm { position: absolute; left: 138px; top: 14px; font: 600 32px/40px "Inter"; color: #111B21; }
+    #ph .st { position: absolute; left: 138px; top: 56px; font: 400 24px/30px "Inter"; color: #667781; }
+    #ph .ar { position: absolute; left: 0; top: 104px; width: 748px; height: 772px; overflow: hidden; }
+    #ph .trk { position: absolute; left: 0; top: 0; width: 748px; height: 4000px; }
+    .m { position: absolute; font: 400 28px/38px "Inter"; color: #111B21; letter-spacing: -0.003em; }
+    .mi { left: 20px; background: #FFFFFF; border-radius: 4px 14px 14px 14px; padding: 12px 18px 34px; min-width: 150px; }
+    .m .l { position: relative; display: block; height: 38px; white-space: nowrap; }
+    .m .s { display: block; height: 12px; }
+    .m b { font-weight: 700; }
+    .mi .tm { position: absolute; right: 14px; bottom: 6px; font: 400 20px/24px "Inter"; color: #667781; }
+    .mimg { padding: 6px 6px 34px; }
+    .mimg .img { position: relative; width: 560px; height: 560px; border-radius: 10px; background: #FFFFFF; outline: 1px solid #E9EDEF; }
+    .mimg .img svg { position: absolute; left: 40px; top: 40px; }
+    .mimg .cap { padding: 10px 12px 0; }
+    .mo { right: 20px; height: 62px; background: #D9FDD3; border-radius: 14px 4px 14px 14px; padding: 12px 14px 12px 22px; display: flex; align-items: flex-end; gap: 14px; }
+    .mo .tx { font: 400 30px/38px "Inter"; }
+    .mo .tm { position: relative; display: flex; align-items: center; gap: 4px; margin-bottom: 1px; font: 400 20px/24px "Inter"; color: #667781; }
+    .mo .tk { width: 26px; height: 16px; }
+    .mo .tk.bl { position: absolute; right: 0; top: 4px; opacity: 0; }
+    .dc { left: 304px; width: 140px; height: 44px; border-radius: 10px; background: #FFFFFF; font: 500 22px/44px "Inter"; color: #54656F; text-align: center; }
+    .mk { position: absolute; left: -6px; right: -6px; top: 3px; bottom: 3px; border-radius: 6px; background: rgba(253, 196, 61, 0.7); transform-origin: 0% 50%; }
+    .hl { position: relative; display: inline-block; }
+    .hl .mk { left: -4px; right: -4px; }
+    .t { position: relative; }
+    .em { width: 1.1em; height: 1.1em; vertical-align: -0.2em; }
+    .ty { left: 20px; width: 104px; height: 58px; background: #FFFFFF; border-radius: 4px 14px 14px 14px; opacity: 0; }
+    .ty i { position: absolute; top: 23px; width: 12px; height: 12px; border-radius: 50%; background: #8696A0; }
+    .ty i:nth-child(1) { left: 26px; } .ty i:nth-child(2) { left: 46px; } .ty i:nth-child(3) { left: 66px; }
+    #ph .ib { position: absolute; left: 0; bottom: 0; width: 748px; height: 104px; background: #F0F2F5; }
+    #ph .pill { position: absolute; left: 16px; top: 14px; width: 620px; height: 76px; border-radius: 38px; background: #FFFFFF; }
+    #ph .phd { position: absolute; left: 32px; top: 19px; font: 400 28px/38px "Inter"; color: #8696A0; }
+    #ph .in { position: absolute; left: 32px; top: 18px; font: 400 30px/40px "Inter"; color: #111B21; opacity: 0; }
+    #ph .snd { position: absolute; left: 652px; top: 14px; width: 76px; height: 76px; border-radius: 50%; background: #00A884; display: flex; align-items: center; justify-content: center; }
+    #ph { left: 1300px; }
+
+    #cur { position: absolute; left: 0; top: 0; width: 120px; height: 120px; }
+    #cur svg { display: block; width: 120px; height: 120px; }
+  </style>
+  <div id="root" data-composition-id="dapur" data-width="1920" data-height="1080">
+    <div id="cam" class="dash">
+      <aside id="side">
+        <div class="brand">beelicious.</div>
+        <div class="tenant">Bakmi Effata</div>
+        <small>Pemilik</small>
+        <nav><span>Ringkasan</span><span class="on">Pesanan</span><span>Menu</span><span>Jadwal Pickup</span><span>Pengaturan</span></nav>
+        <div class="acct"><span class="btn">Ganti kata sandi</span><span class="btn">Keluar</span></div>
+      </aside>
+      <main id="content">
+        <header class="head">
+          <div><h1>Pesanan</h1><p>Pantau pesanan lunas dan prosesnya.</p></div>
+          <span class="btn">Muat ulang</span>
+        </header>
+        <div class="filters">
+          <label>Cari nomor pesanan<span class="in"></span></label>
+          <label>Antrean<span class="in">Lunas &amp; aktif</span></label>
+          <label>Status pesanan<span class="in">Semua status</span></label>
+          <label>Tanggal pickup<span class="in"></span></label>
+          <label>Urutan<span class="in">Pickup terdekat</span></label>
+        </div>
+        <div class="tbl">
+          <div class="tr th"><div>Pesanan / pelanggan</div><div>Menu</div><div>Pickup</div><div>Pembayaran / status</div><div>Total</div></div>
+          <div class="tr row" id="row">
+            <div><span class="link" id="link">BEE-20261125-3F9A1C2B</span><small>Pelanggan WhatsApp</small><small>Dibuat 25 Nov 2026, 11.05 WIB</small></div>
+            <div>2× Bakmi Ayam Pangsit</div>
+            <div>25 Nov 2026, 12.30 WIB</div>
+            <div><span class="chip">Lunas</span><span class="chip">Menunggu diterima</span><small>Midtrans Sandbox</small></div>
+            <div>Rp&nbsp;60.000</div>
+          </div>
+        </div>
+        <div class="pager"><span>1 hasil · Halaman 1</span><span class="btn">Sebelumnya</span><span class="btn">Berikutnya</span></div>
+      </main>
+    </div>
+
+    <div id="split" class="dash">
+      <div id="stk">
+        <div id="stk-s">
+          <h1>BEE-20261125-3F9A1C2B</h1>
+          <dl class="dl"><dt>Status pesanan</dt><dd>
+            <span class="chip" id="ch0">Menunggu diterima</span><span class="chip" id="ch1">Diterima</span><span class="chip" id="ch2">Disiapkan</span><span class="chip" id="ch3">Siap diambil</span>
+          </dd></dl>
+          <section class="panel">
+            <h2>Tindakan</h2>
+            <div class="next"><p id="nx0">Langkah berikutnya: terima pesanan.</p><p id="nx1">Langkah berikutnya: mulai siapkan.</p><p id="nx2">Langkah berikutnya: tandai siap diambil.</p><p id="nx3">Langkah berikutnya: tandai sudah diambil.</p></div>
+            <div class="acts"><span class="btn primary" id="bt0">Terima pesanan</span><span class="btn primary" id="bt1">Mulai siapkan</span><span class="btn primary" id="bt2">Tandai siap diambil</span><span class="btn primary" id="bt3">Tandai sudah diambil</span></div>
+            <p class="muted">Perubahan status tidak membatalkan pembayaran atau mengembalikan dana.</p>
+          </section>
+          <p class="notice" id="notice">Status pesanan diperbarui. Notifikasi pelanggan diproses terpisah.</p>
+          <div id="back"></div>
+          <div id="dlg" role="dialog" data-layout-allow-overlap>
+            <div class="title"><h2 id="dt0">Terima pesanan</h2><h2 id="dt1">Mulai siapkan</h2><h2 id="dt2">Tandai siap diambil</h2></div>
+            <p>Pastikan kondisi pesanan sesuai sebelum melanjutkan.</p>
+            <div class="acts"><span class="btn">Kembali</span><span class="btn primary" id="ok">Konfirmasi</span></div>
+          </div>
+        </div>
+      </div>
+      <!-- the customer's WhatsApp chat receives each status (dashboard/service.ts) -->
+      <div id="ph" role="img" aria-label="Percakapan WhatsApp pelanggan dengan Beelicious">
+      <div class="hd">
+        <svg class="bk" viewBox="0 0 24 24"><path d="M15 5 L8 12 L15 19" fill="none" stroke="#54656F" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="av"><img src="assets/emoji/1f41d.svg" alt=""></div>
+        <div class="nm">Beelicious</div><div class="st">online</div>
+      </div>
+      <div class="ar"><div class="trk" data-layout-allow-overflow>
+        <div class="m mi" id="b10"><span class="l"><img class="em" src="assets/emoji/2705.svg" alt=""> Pembayaran terverifikasi</span><span class="s"></span><span class="l">Pesanan: BEE-20261125-3F9A1C2B</span><span class="l">Tenant: Bakmi Effata</span><span class="l">Pickup: 25 Nov, 12.30 WIB</span><span class="l">Dibayar: Rp60.000</span><span class="l">Status: Pembayaran diterima</span><span class="s"></span><span class="l">Persiapan oleh tenant belum</span><span class="l">dikonfirmasi. Pesanan belum</span><span class="l">dinyatakan siap diambil.</span><span class="s"></span><span class="l"><b>Menu</b> — Pesan lagi</span><span class="l"><b>Keranjang</b> — Lihat keranjang</span><span class="l"><b>CEK</b> — Lihat status pesanan</span><span class="l"><b>Bantuan</b> — Lihat panduan</span><span class="tm">11.07</span></div>
+        <div class="m mi" id="nb1"><span class="l">Pesanan kamu sudah diterima oleh</span><span class="l">Bakmi Effata!</span><span class="s"></span><span class="l">Pesanan: BEE-20261125-3F9A1C2B</span><span class="l">Tenant: Bakmi Effata</span><span class="l">Pickup: 25 Nov 2026, 12.30 WIB</span><span class="tm">11.41</span></div>
+        <div class="m mi" id="nb2"><span class="l">Pesanan kamu sedang disiapkan.</span><span class="s"></span><span class="l">Pesanan: BEE-20261125-3F9A1C2B</span><span class="l">Tenant: Bakmi Effata</span><span class="l">Pickup: 25 Nov 2026, 12.30 WIB</span><span class="tm">11.58</span></div>
+        <div class="m mi" id="nb3"><span class="l">Pesanan kamu sudah siap diambil!</span><span class="s"></span><span class="l">Pesanan: BEE-20261125-3F9A1C2B</span><span class="l">Tenant: Bakmi Effata</span><span class="l">Pickup: 25 Nov 2026, <span class="hl"><i class="mk"></i><span class="t">12.30</span></span> WIB</span><span class="tm">12.24</span></div>
+        <div class="m ty" id="ty"><i></i><i></i><i></i></div>
+      </div></div>
+      <div class="ib">
+        <div class="pill"><span class="phd" id="phd">Ketik pesan</span></div>
+        <div class="snd" id="snd"><svg width="40" height="40" viewBox="0 0 24 24"><path d="M4 12 L20 4 L14 20 L11.5 13 Z" fill="#FFFFFF"/></svg></div>
+      </div>
+    </div>
+    </div>
+
+    <div id="cur" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 3 L5 19 L9 15 L12 22 L15 20.5 L11.5 14 L18 14 Z" fill="#1D1B1B" stroke="#FFFBF3" stroke-width="1.4" stroke-linejoin="round"/></svg></div>
+  </div>
+  <script>
+    (function () {
+      const B = 0.4651; // 129 BPM
+      const tl = gsap.timeline({ paused: true });
+      // Static layout from line counts (no DOM measurement): bubble = 12 + 38·lines + 12·blank + 34 (time row).
+      const T = {};
+      (function layout() {
+        let y = 16;
+        document.querySelectorAll("#ph .trk > .m:not(.ty)").forEach((el) => {
+          const nl = el.querySelectorAll(".l").length, ns = el.querySelectorAll(".s").length;
+          let h = 12 + 38 * nl + 12 * ns + 34;
+          if (el.classList.contains("mo")) h = 62;
+          if (el.classList.contains("dc")) h = 44;
+          if (el.classList.contains("mimg")) h += 564;
+          el.style.top = y + "px";
+          T[el.id] = { top: y, bottom: y + h, h };
+          y += h + 14;
+        });
+      })();
+      const AREA = 772;
+      const fit = (id) => Math.min(0, AREA - 16 - T[id].bottom);          // newest message's bottom above the input bar
+      const fitTop = (id) => Math.min(0, 16 - T[id].top);                 // a tall message: its top
+      const fitTyping = (id) => Math.min(0, AREA - 16 - (T[id].top + 58)); // the typing dots where the message will appear
+      gsap.set("#ph .mk", { scaleX: 0 });
+      // the bot is typing, then its message arrives
+      const botSays = (id, at, view) => {
+        tl.set("#ty", { top: T[id].top, opacity: 1 }, at - 0.42);
+        tl.to("#ph .trk", { y: fitTyping(id), duration: 0.3, ease: "power3.inOut" }, at - 0.44);
+        tl.fromTo("#ty i", { y: 0 }, { y: -7, duration: 0.1, ease: "sine.inOut", yoyo: true, repeat: 1, stagger: 0.07, immediateRender: false }, at - 0.4);
+        tl.set("#ty", { opacity: 0 }, at);
+        tl.fromTo("#" + id, { opacity: 0, scale: 0.92, transformOrigin: "0% 100%" }, { opacity: 1, scale: 1, duration: 0.18, ease: "back.out(1.6)", immediateRender: false }, at);
+        tl.to("#ph .trk", { y: view === undefined ? fit(id) : view, duration: 0.32, ease: "power3.inOut" }, at);
+      };
+      // the student types the number and sends it
+      const iSend = (inId, outId, at) => {
+        tl.set("#phd", { opacity: 0 }, at - 0.32);
+        tl.set("#" + inId, { opacity: 1 }, at - 0.32);
+        tl.to("#snd", { scale: 0.88, duration: 0.08, ease: "power2.in" }, at - 0.1);
+        tl.to("#snd", { scale: 1, duration: 0.16, ease: "power2.out" }, at - 0.02);
+        tl.set("#" + inId, { opacity: 0 }, at);
+        tl.set("#phd", { opacity: 1 }, at);
+        tl.fromTo("#" + outId, { opacity: 0, y: 46, scale: 0.94, transformOrigin: "100% 100%" }, { opacity: 1, y: 0, scale: 1, duration: 0.22, ease: "power3.out", immediateRender: false }, at);
+        tl.to("#ph .trk", { y: fit(outId), duration: 0.3, ease: "power3.inOut" }, at);
+        tl.to("#" + outId + " .tk.bl", { opacity: 1, duration: 0.1, ease: "none" }, at + 0.35);
+      };
+      const mark = (sel, at) => tl.to(sel, { scaleX: 1, duration: 0.24, ease: "expo.out" }, at);
+      const titleIn = (sel, at) => tl.fromTo(sel, { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.15, ease: "power4.out", immediateRender: false }, at);
+      const out = (sel, at) => tl.to(sel, { opacity: 0, filter: "blur(10px)", duration: 0.12, ease: "power3.in" }, at);
+      // camera: screen = s * native + (x, y)
+      const shot = (s, cx, cy) => ({ scale: s, x: 960 - s * cx, y: 540 - s * cy });
+      // cursor tip sits at (25, 15) inside its 120 px box
+      const at = (tx, ty) => ({ x: tx - 25, y: ty - 15 });
+      const press = (t) => {
+        tl.to("#cur", { scale: 0.9, transformOrigin: "21% 12%", duration: 0.1, ease: "power2.in" }, t);
+        tl.to("#cur", { scale: 1, duration: 0.2, ease: "power2.out" }, t + 0.1);
+      };
+      const swap = (from, to, t) => {
+        tl.set(from, { opacity: 0 }, t);
+        tl.fromTo(to, { opacity: 0, scale: 1.25, transformOrigin: "0% 50%" }, { opacity: 1, scale: 1, duration: 0.22, ease: "back.out(2.5)", immediateRender: false }, t);
+      };
+
+      gsap.set("#cam", { scale: 1, x: 0, y: 0 });
+      gsap.set("#row > div", { opacity: 0 });
+      gsap.set("#cur", at(2100, 1200));
+      gsap.set(["#ch1", "#ch2", "#ch3", "#nx1", "#nx2", "#nx3", "#bt1", "#bt2", "#bt3", "#dt1", "#dt2"], { opacity: 0 });
+      gsap.set("#ph", { x: 700 });
+      gsap.set(["#nb1", "#nb2", "#nb3"], { opacity: 0 });
+      gsap.set("#ph .trk", { y: fit("b10") });
+
+      // the order lands in the merchant's table
+      // the pan from bayar continues: the dashboard slides in from the right and settles
+      tl.fromTo("#cam", { x: 1500 }, { x: 0, duration: 0.5, ease: "power3.out", immediateRender: true }, 0);
+      // the paid order arrives as a new row, briefly highlighted
+      tl.fromTo("#row > div", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.15, ease: "power4.out", stagger: 0.04, immediateRender: false }, 0.55);
+      tl.fromTo("#row", { backgroundColor: "rgba(253, 196, 61, 0.45)" }, { backgroundColor: "rgba(253, 196, 61, 0)", duration: 1.2, ease: "power2.out", immediateRender: false }, 0.55);
+
+      // push in on payment + fulfilment, then pan to the order number
+      tl.to("#cam", { ...shot(2.2, 1430, 330), duration: 0.5, ease: "power2.inOut" }, 2 * B);
+      tl.to("#cam", { ...shot(2.2, 720, 330), duration: 0.45, ease: "power2.inOut" }, 5 * B);
+      // the cursor opens the order
+      tl.to("#cur", { ...at(2.2 * 500 + (960 - 2.2 * 720), 2.2 * 303 + (540 - 2.2 * 330)), duration: 0.45, ease: "power3.out" }, 6 * B);
+      press(7 * B);
+      const Z = 7 * B + 0.12;
+      tl.to("#cam", { ...shot(7, 520, 311), opacity: 0, filter: "blur(12px)", duration: 0.34, ease: "power3.in" }, Z);
+      tl.fromTo("#split", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ease: "power3.out", immediateRender: false }, Z + 0.26);
+      tl.to("#ph", { x: 0, duration: 0.35, ease: "power3.out" }, Z + 0.26);
+
+      // three confirmed steps; each sends the customer a notification, processed separately
+      const BTN = at(72 + 2.4 * 80, 58 + 2.4 * 207);
+      const OK = at(72 + 2.4 * 372, 58 + 2.4 * 225); // Konfirmasi measured at (973, 596) on screen
+      const steps = [
+        { t: 9 * B, chip: ["#ch0", "#ch1"], next: ["#nx0", "#nx1"], btn: ["#bt0", "#bt1"], title: "#dt0", nb: "nb1" },
+        { t: 12 * B, chip: ["#ch1", "#ch2"], next: ["#nx1", "#nx2"], btn: ["#bt1", "#bt2"], title: "#dt1", nb: "nb2" },
+        { t: 15 * B, chip: ["#ch2", "#ch3"], next: ["#nx2", "#nx3"], btn: ["#bt2", "#bt3"], title: "#dt2", nb: "nb3" },
+      ];
+      steps.forEach((st, i) => {
+        const glide = i === 0 ? 0.4 : 0.3;
+        tl.to("#cur", { ...BTN, duration: glide, ease: "power3.out" }, st.t - glide - 0.02);
+        press(st.t);
+        // the confirm dialog
+        tl.set(["#dt0", "#dt1", "#dt2"], { opacity: 0 }, st.t + 0.1);
+        tl.set(st.title, { opacity: 1 }, st.t + 0.1);
+        tl.fromTo("#back", { opacity: 0 }, { opacity: 1, duration: 0.12, ease: "none", immediateRender: false }, st.t + 0.1);
+        tl.fromTo("#dlg", { opacity: 0, scale: 0.94, transformOrigin: "50% 50%" }, { opacity: 1, scale: 1, duration: 0.15, ease: "power3.out", immediateRender: false }, st.t + 0.1);
+        tl.to("#cur", { ...OK, duration: 0.28, ease: "power3.out" }, st.t + (i === 0 ? 0.44 : 0.2));
+        const c = st.t + (i === 0 ? 0.8 : 0.56);
+        press(c);
+        tl.to(["#dlg", "#back"], { opacity: 0, duration: 0.08, ease: "power3.in" }, c + 0.1);
+        swap(st.chip[0], st.chip[1], c + 0.14);
+        tl.set(st.next[0], { opacity: 0 }, c + 0.14);
+        tl.set(st.next[1], { opacity: 1 }, c + 0.14);
+        tl.set(st.btn[0], { opacity: 0 }, c + 0.14);
+        tl.set(st.btn[1], { opacity: 1 }, c + 0.14);
+        if (i === 0) tl.fromTo("#notice", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.15, ease: "power4.out", immediateRender: false }, c + 0.2);
+        botSays(st.nb, c + 0.5);
+      });
+
+      // the cursor leaves; the customer's chat takes the frame
+      tl.to("#cur", { x: 1300, y: 1250, duration: 0.3, ease: "power2.in" }, 17.6 * B);
+      tl.to("#stk", { x: -700, opacity: 0, filter: "blur(10px)", duration: 0.5, ease: "power3.in" }, 18.6 * B);
+      tl.to("#ph", { x: 1056 - 1300, duration: 0.6, ease: "power3.inOut" }, 20 * B - 0.62);
+      window.__timelines = window.__timelines || {};
+      window.__timelines["dapur"] = tl;
+    })();
+  </script>
+</template>
