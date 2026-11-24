@@ -154,36 +154,39 @@ export class ConversationEngine implements ConversationHandler {
               const context = parsed.success
                 ? { ...session, data: parsed.data }
                 : idle();
-              const checkoutResult = this.checkout
+              const checkoutDeps = this.checkout
+                ? {
+                    tx,
+                    config: this.checkout,
+                    scope: { customerId: customer.id, sessionId: session.id },
+                    eventId,
+                    now: this.now,
+                    maxQuantity: this.maxQuantity,
+                    lockedSession,
+                    chatId:
+                      typeof (claimed.data as { chatId?: unknown }).chatId ===
+                      'string'
+                        ? (claimed.data as { chatId: string }).chatId
+                        : input.senderId,
+                    ...(typeof (claimed.data as { senderPhone?: unknown })
+                      .senderPhone === 'string'
+                      ? {
+                          recipientPhone: (
+                            claimed.data as { senderPhone: string }
+                          ).senderPhone,
+                        }
+                      : {}),
+                  }
+                : undefined;
+              const checkoutResult = checkoutDeps
                 ? await checkoutTransition(
                     context,
                     input.command,
-                    {
-                      tx,
-                      config: this.checkout,
-                      scope: { customerId: customer.id, sessionId: session.id },
-                      eventId,
-                      now: this.now,
-                      maxQuantity: this.maxQuantity,
-                      lockedSession,
-                      chatId:
-                        typeof (claimed.data as { chatId?: unknown }).chatId ===
-                        'string'
-                          ? (claimed.data as { chatId: string }).chatId
-                          : input.senderId,
-                      ...(typeof (claimed.data as { senderPhone?: unknown })
-                        .senderPhone === 'string'
-                        ? {
-                            recipientPhone: (
-                              claimed.data as { senderPhone: string }
-                            ).senderPhone,
-                          }
-                        : {}),
-                    },
+                    checkoutDeps,
                     session.requiresRefresh || !parsed.success,
                   )
                 : null;
-              const result =
+              let result =
                 checkoutResult ??
                 (await transition(
                   context,
@@ -203,26 +206,34 @@ export class ConversationEngine implements ConversationHandler {
                       lockedSession,
                     ),
                     scope: { customerId: customer.id, sessionId: session.id },
+                    checkout: !!this.checkout,
                   },
                 ));
+              // Finishing selection continues straight to pickup in the same turn.
+              // Only explicit "finish" choices chain; viewing a READY cart does not.
               if (
-                this.checkout &&
+                checkoutDeps &&
                 !checkoutResult &&
+                !session.requiresRefresh &&
+                parsed.success &&
+                input.command.kind === 'select' &&
+                ['CART_ACTION', 'CART_REVIEW', 'CART_CONFIRM_PRICE'].includes(
+                  context.state,
+                ) &&
                 result.context.state === 'CART_READY'
-              )
-                result.text = result.text.replace(
-                  'Pickup dan pembayaran tersedia pada tahap berikutnya.\n\n',
-                  '',
+              ) {
+                const pickup = await checkoutTransition(
+                  result.context,
+                  { kind: 'select', value: 2 },
+                  checkoutDeps,
                 );
-              if (
-                this.checkout &&
-                !checkoutResult &&
-                result.context.state === 'CART_READY'
-              )
-                result.text = result.text.replace(
-                  '1. Edit Keranjang',
-                  '1. Edit Keranjang\n2. Lanjut Checkout',
-                );
+                if (pickup?.context.state === 'SELECT_PICKUP')
+                  result = {
+                    context: pickup.context,
+                    text: `✅ Pilihan tersimpan.\n\n${pickup.text}`,
+                  };
+                else if (pickup) result = pickup;
+              }
               if (result.text.length > 4096)
                 throw new Error('Conversation response exceeds limit');
               stage = 'persist';

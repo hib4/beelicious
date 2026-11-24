@@ -71,6 +71,8 @@ export function createBackgroundRuntime(
           : {}),
         ...(dependencies.qr ? { qr: dependencies.qr } : {}),
         ...(dependencies.now ? { now: dependencies.now } : {}),
+        // Follow-up notifications (e.g. payment QR) wait for the inbox reply; start them promptly.
+        processed: () => checkoutWorker?.wake(),
       },
     );
   }

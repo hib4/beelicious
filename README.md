@@ -102,7 +102,7 @@ Authentication persists in the ignored `.local/baileys-auth` directory, so valid
 
 Only the selected provider initializes. All providers share the same conversation and business logic.
 
-**Customer commands:** `Halo` / `Hi` / `Mulai`, `Menu`, `Keranjang`, `Kembali` / `0`, `Batal`, `Bantuan`, `CEK`, and `Kirim Ulang QR`. Follow numbered options; use `8` / `9` for pagination where shown. `Batal` preserves a browsing cart but requests cancellation while payment is pending.
+**Customer commands:** any first message opens the tenant list; `Halo` / `Hai` / `Hi` / `Mulai`, `Menu`, `Keranjang`, `Kembali` / `0`, `Batal`, `Bantuan`, `CEK`, and `Kirim Ulang QR`. Follow numbered options; use `8` / `9` for pagination where shown. `Batal` preserves a browsing cart but requests cancellation while payment is pending.
 
 ## Payments
 

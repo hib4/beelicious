@@ -22,16 +22,48 @@ export const commandSchema = z.discriminatedUnion('kind', [
   }),
 ]);
 export type Command = z.infer<typeof commandSchema>;
+// Friendly aliases map onto the fixed command classes; raw text is never stored.
+const aliases: Record<string, Command['kind']> = {
+  halo: 'start',
+  hallo: 'start',
+  helo: 'start',
+  hello: 'start',
+  hai: 'start',
+  hi: 'start',
+  hey: 'start',
+  p: 'start',
+  mulai: 'start',
+  menu: 'start',
+  pesan: 'start',
+  order: 'start',
+  '0': 'back',
+  kembali: 'back',
+  back: 'back',
+  batal: 'cancel',
+  cancel: 'cancel',
+  keranjang: 'cart',
+  'lihat keranjang': 'cart',
+  cart: 'cart',
+  cek: 'check',
+  'cek pembayaran': 'check',
+  status: 'check',
+  'kirim ulang qr': 'resend',
+  bantuan: 'help',
+  help: 'help',
+  tolong: 'help',
+  '?': 'help',
+};
 export function parseCommand(text: string): Command {
-  const input = text.trim().toLowerCase();
-  if (!input) return { kind: 'empty' };
-  if (['halo', 'hi', 'mulai', 'menu'].includes(input)) return { kind: 'start' };
-  if (['0', 'kembali'].includes(input)) return { kind: 'back' };
-  if (input === 'batal') return { kind: 'cancel' };
-  if (input === 'keranjang') return { kind: 'cart' };
-  if (input === 'cek') return { kind: 'check' };
-  if (input === 'kirim ulang qr') return { kind: 'resend' };
-  if (input === 'bantuan') return { kind: 'help' };
+  const raw = text.trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!raw) return { kind: 'empty' };
+  if (raw === '?') return { kind: 'help' };
+  // Tolerate "1.", "1)", "#1", "Halo!" and trailing emoji without guessing words.
+  const input = raw
+    .replace(/^[#*_~\s]+/u, '')
+    .replace(/[\s.,!?;:)*_~\p{Extended_Pictographic}️]+$/u, '');
+  if (!input) return { kind: 'invalid' };
+  const kind = aliases[input];
+  if (kind && kind !== 'select') return { kind } as Command;
   if (/^[1-9]\d{0,9}$/.test(input) && Number(input) <= 2147483647)
     return { kind: 'select', value: Number(input) };
   return { kind: 'invalid' };

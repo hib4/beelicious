@@ -126,3 +126,85 @@ it('checks approval again after preparation and suppresses sending on revocation
     await adapter.stop();
   }
 });
+function latencyFixture() {
+  const store = fakeStore();
+  const data = incomingEvents(
+    [incoming({ text: 'Menu', timestamp: Date.now() })],
+    true,
+  )[0]!.data;
+  const event = (id: string) => ({
+    id,
+    data,
+    kind: 'message' as const,
+    attempts: 0,
+    preparationAttempts: 0,
+  });
+  const processed = vi.fn();
+  const adapter = createMockAdapter([PHONE], callbacksFixture());
+  const worker = createInboxWorker(
+    store,
+    adapter,
+    {
+      enabled: true,
+      conversation: {
+        handleIncomingMessage: vi.fn().mockResolvedValue('Prepared response'),
+      },
+      scope: () => ({
+        provider: 'mock',
+        accountId: 'local-mock',
+        conversationEnabled: true,
+      }),
+      decode(data) {
+        const p = storedIncomingSchema.safeParse(data);
+        return p.success ? p.data : undefined;
+      },
+      processed,
+    },
+    vi.fn(),
+  );
+  return { store, event, adapter, worker, processed };
+}
+it('drains queued messages without waiting for the idle poll interval', async () => {
+  const f = latencyFixture();
+  f.store.claim
+    .mockResolvedValueOnce(f.event('first') as never)
+    .mockResolvedValueOnce(f.event('second') as never);
+  await f.adapter.start();
+  const started = Date.now();
+  try {
+    f.worker.start();
+    await vi.waitFor(() => expect(f.adapter.outgoing).toHaveLength(2), {
+      timeout: 700,
+      interval: 10,
+    });
+    expect(Date.now() - started).toBeLessThan(700);
+    expect(f.processed).toHaveBeenCalledTimes(2);
+  } finally {
+    await f.worker.stop();
+    await f.adapter.stop();
+  }
+});
+it('wakes an idle worker immediately when new ingress is committed', async () => {
+  const f = latencyFixture();
+  await f.adapter.start();
+  try {
+    f.worker.start();
+    await vi.waitFor(() => expect(f.store.claim).toHaveBeenCalled(), {
+      timeout: 200,
+      interval: 5,
+    });
+    // The worker is now sleeping for the idle interval.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    f.store.claim.mockResolvedValueOnce(f.event('woken') as never);
+    const woken = Date.now();
+    f.worker.wake();
+    await vi.waitFor(() => expect(f.adapter.outgoing).toHaveLength(1), {
+      timeout: 500,
+      interval: 5,
+    });
+    expect(Date.now() - woken).toBeLessThan(500);
+  } finally {
+    await f.worker.stop();
+    await f.adapter.stop();
+  }
+});

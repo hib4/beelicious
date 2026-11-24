@@ -192,8 +192,9 @@ it('persists the full catalog flow and restores it with a new engine', async () 
   await f.w.stop();
   const restored = await fixture(f.active, new ConversationEngine(client));
   s = await send(restored, '1');
+  // Choosing an item opens its quantity prompt in one step.
   expect(s).toMatchObject({
-    state: 'VIEW_MENU_ITEM',
+    state: 'SELECT_QUANTITY',
     selectedTenantId: t.id,
     selectedCategoryId: category.id,
     selectedMenuItemId: item.id,
@@ -322,8 +323,9 @@ it('expires sessions, keeps help from extending inactivity, and recovers corrupt
     data: { stateData: {} },
   });
   s = await send(f, '1');
-  expect(s.state).toBe('IDLE');
-  expect(f.adapter.outgoing.at(-1)!.text).toContain('Kirim Halo');
+  // Unreadable state falls back to IDLE, and any message from IDLE opens the tenant list.
+  expect(s.state).toBe('SELECT_TENANT');
+  expect(f.adapter.outgoing.at(-1)!.text).toContain('Selamat datang');
 });
 it('does not register unapproved contacts or consume conversation work when disabled', async () => {
   const a = scope();
@@ -483,8 +485,7 @@ async function addTransportCart(
     selected = await session(active);
   }
   await sendText('1'); // category
-  await sendText('1'); // details
-  await sendText('1'); // quantity prompt
+  await sendText('1'); // item: details and quantity prompt together
   await sendText('2'); // committed addition
   const current = await session(active);
   const cart = await client.cart.findFirstOrThrow({

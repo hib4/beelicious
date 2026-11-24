@@ -84,7 +84,7 @@ export const idle = (): Context => ({
   data: initialData(),
 });
 export const HELP =
-  'Bantuan Beelicious 🐝\n\nHalo / Hi / Mulai / Menu: mulai dari daftar tenant.\nBalas nomor pilihan yang ditampilkan.\n8 / 9: halaman sebelumnya / berikutnya (jika tersedia).\n0 / Kembali: kembali.\nBatal: akhiri sesi.\nBantuan: tampilkan panduan.\n\nKeranjang: lihat pilihan tersimpan. Batal tidak menghapus keranjang.\nPickup dan pembayaran belum tersedia.';
+  'Bantuan Beelicious 🐝\n\nCara memesan: pilih tenant, kategori, lalu menu dengan membalas nomornya. Masukkan jumlah porsi, lalu lanjutkan ke keranjang.\n\n*Menu* — Mulai dari daftar tenant\n*Keranjang* — Lihat atau ubah pilihan\n*0* — Kembali satu langkah\n*8* / *9* — Halaman sebelumnya / berikutnya\n*Batal* — Akhiri sesi (keranjang tetap tersimpan)';
 export const rupiah = (value: number) =>
   `Rp${String(value).replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`;
 const label = (value: string) => value.replace(/\s+/g, ' ').trim();
@@ -145,7 +145,7 @@ export async function transition(
   original: Context,
   command: Command,
   catalog: CatalogServices,
-  flags: { expired?: boolean; refresh?: boolean } = {},
+  flags: { expired?: boolean; refresh?: boolean; show?: boolean } = {},
   carts?: CartDependencies,
 ): Promise<{ context: Context; text: string }> {
   const cartResult = carts
@@ -164,15 +164,19 @@ export async function transition(
   }
   if (flags.expired && c.state !== 'IDLE') {
     reset();
-    notice =
-      'Sesi telah berakhir karena tidak aktif. Silakan mulai kembali.\n\n';
+    const saved = carts ? await carts.service.getCart(carts.scope) : null;
+    notice = `Sesi sebelumnya berakhir karena tidak aktif.${saved?.items.length ? ' Keranjangmu masih tersimpan — kirim *Keranjang* untuk melihatnya.' : ''}\n\n`;
   }
   if (command.kind === 'cancel')
     return {
       context: idle(),
-      text: 'Keranjang tetap tersimpan. Sesi dibatalkan. Kirim Halo, Hi, Mulai, atau Menu untuk mulai kembali.',
+      text: 'Sesi dibatalkan. Keranjang tetap tersimpan. Kirim pesan apa saja untuk mulai kembali.',
     };
-  if (command.kind === 'start') {
+  // From IDLE, any message (greeting, number, text) opens the tenant list.
+  if (
+    command.kind === 'start' ||
+    (c.state === 'IDLE' && command.kind !== 'help')
+  ) {
     reset();
     return renderResult(await screen());
   }
@@ -187,7 +191,12 @@ export async function transition(
     state: c.state,
   };
   let current = await screen();
-  if (flags.expired || flags.refresh || before.state !== c.state) {
+  if (
+    flags.expired ||
+    flags.refresh ||
+    flags.show ||
+    before.state !== c.state
+  ) {
     if (flags.refresh)
       notice = 'Tampilan diperbarui. Silakan pilih kembali.\n\n';
     return renderResult(current);
@@ -224,6 +233,17 @@ export async function transition(
       } else if (c.state === 'SELECT_MENU') {
         c.state = 'VIEW_MENU_ITEM';
         c.selectedMenuItemId = id;
+        // With carts, choosing an item goes straight to its quantity prompt.
+        if (carts) {
+          const quantity = await cartTransition(
+            c,
+            { kind: 'select', value: 1 },
+            catalog,
+            carts,
+            {},
+          );
+          if (quantity) return quantity;
+        }
       }
       current = await screen();
       return renderResult(current);
@@ -271,7 +291,7 @@ export async function transition(
   async function screen(): Promise<Screen> {
     if (c.state === 'IDLE')
       return {
-        text: 'Kirim Halo, Hi, Mulai, atau Menu untuk melihat tenant Beelicious 🐝',
+        text: 'Sampai jumpa! Kirim pesan apa saja untuk mulai memesan lagi 🐝',
         ids: [],
         fingerprint: '',
         pageCount: 1,

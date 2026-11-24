@@ -826,7 +826,7 @@ it('atomically deduplicates checkout through the persisted ConversationEngine ac
   expect((await send('2')).response).toContain('Pilih Waktu Pickup');
   expect((await send('1')).response).toContain('Konfirmasi Pesanan');
   const confirmed = await send('1');
-  expect(confirmed.response).toContain('tersimpan');
+  expect(confirmed.response).toContain('dibuat');
   expect(await confirmed.repeat()).toBe(confirmed.response);
   expect(await p.order.count({ where: { sessionId: f.session.id } })).toBe(1);
   expect(
@@ -1355,10 +1355,11 @@ it.each(['pending', 'provider_changed', 'review'] as const)(
     expect(result.session.state).toBe('SELECT_CATEGORY');
     result = await sendCheckoutCommand(f, '1', active);
     expect(result.session.state).toBe('SELECT_MENU');
+    // Opening an item stays read-only browsing; entering a quantity is blocked.
     result = await sendCheckoutCommand(f, '1', active);
-    expect(result.session.state).toBe('VIEW_MENU_ITEM');
+    expect(result.session.state).toBe('SELECT_QUANTITY');
     result = await sendCheckoutCommand(f, '1', active);
-    expect(result.session.state).toBe('VIEW_MENU_ITEM');
+    expect(result.session.state).toBe('SELECT_QUANTITY');
     expect(result.response).toContain('Selesaikan pembayaran sebelumnya');
     result = await sendCheckoutCommand(f, '0', active);
     expect(result.session.state).toBe('SELECT_MENU');
@@ -1406,6 +1407,48 @@ it('keeps an overdue payment unverified and does not enqueue an unusable QR', as
   expect((await f.orders.current(f.scope))?.payment?.status).toBe('PENDING');
   expect((await f.orders.current(f.scope))?.reservation?.status).toBe('HELD');
 });
+it('returns to tenant selection after verified payment while CEK still reports the order', async () => {
+  const f = await initiated();
+  await p.mockPaymentTransaction.update({
+    where: { paymentId: f.order.payment!.id },
+    data: { status: 'settlement' },
+  });
+  await f.payments.request(f.scope, true);
+  await f.payments.tick();
+  expect((await f.orders.current(f.scope))?.status).toBe('CONFIRMED');
+  await p.conversationSession.update({
+    where: { id: f.session.id },
+    data: {
+      state: 'AWAITING_PAYMENT',
+      selectedTenantId: f.tenant.id,
+      selectedCategoryId: null,
+      selectedMenuItemId: null,
+      stateData: initialData(),
+      lastInteractionAt: time,
+    },
+  });
+  const greeting = await sendCheckoutCommand(f, 'Hai');
+  expect(greeting.session.state).toBe('SELECT_TENANT');
+  expect(greeting.response).toContain('Mau melihat menu tenant mana');
+  expect(greeting.response).not.toContain('Pesan Lagi');
+  const check = await sendCheckoutCommand(f, 'CEK');
+  expect(check.session.state).toBe('ORDER_CONFIRMED');
+  expect(check.response).toContain('Pembayaran terverifikasi');
+  expect(check.response).not.toContain('Pesan Lagi');
+  expect(check.response).toContain('*Keranjang* — Lihat keranjang');
+  expect(greeting.response).toContain('*Keranjang* — Lihat keranjang');
+  const cart = await sendCheckoutCommand(f, 'Keranjang');
+  expect(cart.response).toContain('Keranjang masih kosong');
+  await sendCheckoutCommand(f, 'CEK');
+  const next = await sendCheckoutCommand(f, '1');
+  expect(next.session.state).toBe('SELECT_TENANT');
+  expect(await f.carts.getCart(f.scope)).toBeNull();
+  const restart = await sendCheckoutCommand(f, 'CEK');
+  expect(restart.session.state).toBe('ORDER_CONFIRMED');
+  const menu = await sendCheckoutCommand(f, 'Menu');
+  expect(menu.session.state).toBe('SELECT_TENANT');
+  expect(menu.response).not.toContain('Sesi diperbarui');
+});
 it('suppresses QR resends while cancellation is pending and resumes checkout after verified cancellation', async () => {
   const f = await initiated();
   const result = await sendCheckoutCommand(f, 'BATAL');
@@ -1434,4 +1477,69 @@ it('suppresses QR resends while cancellation is pending and resumes checkout aft
   });
   expect(newer.id).not.toBe(f.order.id);
   expect(newer.status).toBe('PENDING_PAYMENT');
+});
+it('completes a first-time order in the streamlined journey and returns to the tenant list after payment', async () => {
+  const f = await fixture();
+  // The journey builds its own cart; retire the fixture's READY cart first.
+  await f.carts.perform(f.scope, { kind: 'abandon' });
+  let replies = 0;
+  const say = async (text: string) => {
+    replies++;
+    return sendCheckoutCommand(f, text);
+  };
+  let r = await say('Hai');
+  expect(r.session.state).toBe('SELECT_TENANT');
+  for (let pages = 0; pages < 30; pages++) {
+    const index = (
+      r.session.stateData as { options: string[] }
+    ).options.indexOf(f.tenant.id);
+    r = await say(index < 0 ? '9' : String(index + 1));
+    if (index >= 0) break;
+  }
+  const paging = replies - 2;
+  expect(r.session.state).toBe('SELECT_CATEGORY');
+  r = await say('1');
+  expect(r.session.state).toBe('SELECT_MENU');
+  r = await say('1');
+  expect(r.session.state).toBe('SELECT_QUANTITY');
+  expect(r.response).toContain('Rice');
+  expect(r.response).toContain('berapa porsi');
+  r = await say('2');
+  expect(r.session.state).toBe('CART_ACTION');
+  expect(r.response).toContain('Rp40.000');
+  expect(r.response).toContain('3. Lanjut Pembayaran');
+  r = await say('3');
+  expect(r.session.state).toBe('SELECT_PICKUP');
+  expect(r.response).toContain('Pilihan tersimpan');
+  expect(r.response).toContain('Pilih Waktu Pickup');
+  r = await say('1');
+  expect(r.session.state).toBe('CONFIRM_CHECKOUT');
+  r = await say('1');
+  expect(r.session.state).toBe('AWAITING_PAYMENT');
+  expect(r.response).toContain('dibuat');
+  expect(replies - paging).toBe(8);
+  const order = (await f.orders.current(f.scope))!;
+  const payments = new PaymentService(
+    p,
+    config,
+    createMockGateway(p, now),
+    now,
+  );
+  await payments.tick();
+  await p.mockPaymentTransaction.update({
+    where: { paymentId: order.payment!.id },
+    data: { status: 'settlement' },
+  });
+  await payments.request(f.scope, true);
+  await payments.tick();
+  expect((await f.orders.current(f.scope))?.status).toBe('CONFIRMED');
+  r = await say('Hai');
+  expect(r.session.state).toBe('SELECT_TENANT');
+});
+it('does not jump to pickup when the customer only views a READY cart', async () => {
+  const f = await fixture();
+  const r = await sendCheckoutCommand(f, 'Keranjang');
+  expect(r.session.state).toBe('CART_READY');
+  expect(r.response).toContain('2. Lanjut Pembayaran');
+  expect(r.response).not.toContain('READY');
 });

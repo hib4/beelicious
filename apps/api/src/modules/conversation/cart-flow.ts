@@ -13,6 +13,8 @@ import { idle, rupiah, transition, type Context } from './flow.js';
 export interface CartDependencies {
   service: CartService;
   scope: CartScope;
+  /** Checkout is enabled, so READY carts can continue to pickup/payment. */
+  checkout?: boolean;
 }
 type Result = { context: Context; text: string };
 const footer =
@@ -41,7 +43,7 @@ async function categories(
     c,
     { kind: 'invalid' },
     catalog,
-    { refresh: true },
+    { show: true },
     deps,
   );
 }
@@ -72,6 +74,7 @@ export async function cartTransition(
   flags: { expired?: boolean; refresh?: boolean },
 ): Promise<Result | null> {
   const c = structuredClone(original);
+  const finish = deps.checkout ? 'Lanjut Pembayaran' : 'Selesai Memilih';
   // Global navigation remains owned by the original browsing flow.
   if (['start', 'cancel', 'help'].includes(command.kind)) return null;
   if (flags.expired) return null;
@@ -137,7 +140,9 @@ export async function cartTransition(
           ? 'Keranjang dikosongkan.\n\n'
           : action.kind === 'update'
             ? 'Jumlah diperbarui.\n\n'
-            : '';
+            : action.kind === 'reopen'
+              ? 'Keranjang dibuka kembali. Silakan edit pilihanmu.\n\n'
+              : '';
     return await review();
   }
   try {
@@ -155,23 +160,21 @@ export async function cartTransition(
       cart = await deps.service.getCart(deps.scope);
       if (cart && cart.tenantId !== c.selectedTenantId)
         return await tenantSelection(c, c.selectedTenantId!, catalog, deps);
-      if (cart?.status === 'READY') {
-        enter(c, 'CART_CONFIRM_REOPEN', cart.tenantId);
-        c.data.fingerprint = cart.fingerprint;
-        return await render();
-      }
+      // A READY cart stays READY until a quantity is actually entered.
       c.state = 'SELECT_QUANTITY';
       c.data.expectedPrice = item.price;
       return await render();
     }
     if (c.state === 'SELECT_QUANTITY') {
       if (command.kind === 'back') {
-        c.state = 'VIEW_MENU_ITEM';
+        c.state = 'SELECT_MENU';
+        c.selectedMenuItemId = null;
+        c.data.expectedPrice = null;
         return await transition(
           c,
           { kind: 'invalid' },
           catalog,
-          { refresh: true },
+          { show: true },
           deps,
         );
       }
@@ -192,6 +195,10 @@ export async function cartTransition(
         notice = `Masukkan jumlah bulat 1–${deps.service.maxQuantity}.\n\n`;
         return await render();
       }
+      cart = await deps.service.getCart(deps.scope);
+      // Adding an item is the customer's explicit choice to edit a READY cart.
+      if (cart?.status === 'READY' && cart.tenantId === c.selectedTenantId)
+        await deps.service.perform(deps.scope, { kind: 'reopen' });
       cart = await deps.service.getOrCreateActiveCart(
         deps.scope,
         c.selectedTenantId!,
@@ -263,11 +270,7 @@ export async function cartTransition(
         paginate(cart.items.length, n);
         return await render();
       }
-      if (n === 1) {
-        enter(c, 'CART_CONFIRM_REOPEN', cart.tenantId);
-        c.data.fingerprint = cart.fingerprint;
-        return await render();
-      }
+      if (n === 1) return await apply({ kind: 'reopen' });
     } else if (c.state === 'CART_CONFIRM_CLEAR' && n === 1)
       return await apply({ kind: 'clear' });
     else if (c.state === 'CART_CONFIRM_REOPEN' && n === 1)
@@ -381,8 +384,11 @@ export async function cartTransition(
         c.selectedMenuItemId!,
         true,
       );
+      const description = item.description?.trim()
+        ? `\n${clean(item.description).slice(0, 500)}`
+        : '';
       return result(
-        `🍳 ${clean(item.name)}\n\nHarga: ${rupiah(item.price)}\n\nBerapa porsi yang ingin dipilih?\nBalas jumlah (1–${deps.service.maxQuantity}).${footer}`,
+        `🍳 *${clean(item.name)}*\nHarga: ${rupiah(item.price)}${description}\n\nMau pesan berapa porsi?\nBalas angka 1–${deps.service.maxQuantity}.${footer}`,
       );
     }
     if (!cart)
@@ -390,10 +396,12 @@ export async function cartTransition(
         context: idle(),
         text: 'Keranjang masih kosong. Kirim Menu untuk mulai kembali.',
       };
-    if (c.state === 'CART_ACTION')
+    if (c.state === 'CART_ACTION') {
+      const count = cart.items.reduce((sum, i) => sum + i.quantity, 0);
       return result(
-        `Mau tambah menu lainnya?\n\n1. Tambah Menu\n2. Lihat Keranjang\n3. Selesai Memilih${footer}`,
+        `🛒 Keranjang: ${count} porsi, subtotal ${rupiah(cart.subtotal)}\n\nMau tambah menu lainnya?\n\n1. Tambah Menu\n2. Lihat Keranjang\n3. ${finish}${footer}`,
       );
+    }
     if (c.state === 'CART_CONFIRM_SWITCH')
       return result(
         `Ganti tenant akan meninggalkan keranjang ${clean(cart.tenantName)}.\n\n1. Tinggalkan keranjang dan ganti tenant\n2. Pertahankan keranjang${footer}`,
@@ -439,7 +447,7 @@ export async function cartTransition(
       : '';
     const ready = c.state === 'CART_READY';
     return result(
-      `${ready ? '✅ Pilihan menu tersimpan!\n\n' : ''}🛒 Keranjang Beelicious\n🏪 ${clean(cart.tenantName)}\n\n${items.rows.map((i) => `${i.quantity}x ${clean(i.name)}${!i.available ? ' (tidak tersedia)' : ''}\n${rupiah(i.lineSubtotal)}${i.unitPrice !== i.currentPrice ? ' (harga tersimpan)' : ''}`).join('\n\n') || 'Keranjang masih kosong.'}\n\nSubtotal: ${rupiah(cart.subtotal)}${items.suffix}${warnings}\n\n${ready ? 'Keranjang READY belum menjadi pesanan.\nPickup dan pembayaran tersedia pada tahap berikutnya.\n\n1. Edit Keranjang' : '1. Tambah Menu\n2. Ubah Jumlah\n3. Hapus Menu\n4. Selesai Memilih\n6. Kosongkan Keranjang'}${footer}`,
+      `${ready ? '✅ Pilihanmu tersimpan (belum dipesan).\n\n' : ''}🛒 Keranjang Beelicious\n🏪 ${clean(cart.tenantName)}\n\n${items.rows.map((i) => `${i.quantity}x ${clean(i.name)}${!i.available ? ' (tidak tersedia)' : ''}\n${rupiah(i.lineSubtotal)}${i.unitPrice !== i.currentPrice ? ' (harga tersimpan)' : ''}`).join('\n\n') || 'Keranjang masih kosong.'}\n\nSubtotal: ${rupiah(cart.subtotal)}${items.suffix}${warnings}\n\n${ready ? `1. Edit Keranjang${deps.checkout ? '\n2. Lanjut Pembayaran' : ''}` : `1. Tambah Menu\n2. Ubah Jumlah\n3. Hapus Menu\n4. ${finish}\n6. Kosongkan Keranjang`}${footer}`,
     );
   }
 }

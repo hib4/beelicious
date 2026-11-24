@@ -72,6 +72,9 @@ export function paymentHelp(
 ): string {
   return `${mockNotice(provider)}Bantuan Checkout 🐝\n\n*CEK* — Periksa pembayaran terakhir${options.resend === false ? '' : '\n*Kirim Ulang QR* — Kirim gambar pembayaran yang sama'}\n*BATAL* — Minta pembatalan pembayaran tertunda\n*Menu* — Jelajahi katalog\n*Keranjang* — Lihat keranjang\n\nPembayaran dikonfirmasi setelah verifikasi. Jika sudah membayar, kirim CEK sebelum mencoba lagi.`;
 }
+/** Bold command list shown once payment is verified, matching other screens. */
+export const paidCommands =
+  '*Menu* — Pesan lagi\n*Keranjang* — Lihat keranjang\n*CEK* — Lihat status pesanan\n*Bantuan* — Lihat panduan';
 export function paidConfirmation(
   provider: Provider,
   order: {
@@ -82,5 +85,5 @@ export function paidConfirmation(
   },
   timezone: string,
 ): string {
-  return `${mockNotice(provider)}✅ Pembayaran terverifikasi\n\nPesanan: ${order.orderNumber}\nTenant: ${order.tenantName}\nPickup: ${pickupLabel(order.pickupAt, timezone)}\nDibayar: ${money(order.amount)}\nStatus: Pembayaran diterima\n\nPersiapan oleh tenant belum dikonfirmasi. Pesanan belum dinyatakan siap diambil.`;
+  return `${mockNotice(provider)}✅ Pembayaran terverifikasi\n\nPesanan: ${order.orderNumber}\nTenant: ${order.tenantName}\nPickup: ${pickupLabel(order.pickupAt, timezone)}\nDibayar: ${money(order.amount)}\nStatus: Pembayaran diterima\n\nPersiapan oleh tenant belum dikonfirmasi. Pesanan belum dinyatakan siap diambil.\n\n${paidCommands}`;
 }

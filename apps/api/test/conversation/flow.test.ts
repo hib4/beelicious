@@ -83,7 +83,7 @@ it('browses all screens and navigates back without stale selections', async () =
 it('preserves context for invalid input and help, and clears it on cancel/restart', async () => {
   const f = fixtures();
   const c = (await advance(idle(), 'hi', f.catalog)).context;
-  for (const text of ['-1', '1.0', '001', '99999999999999', 'hello', '6']) {
+  for (const text of ['-1', '1.0', '001', '99999999999999', 'nasi', '6']) {
     const r = await advance(c, text, f.catalog);
     expect(r.context).toEqual(c);
     expect(r.text).toContain('belum valid');
@@ -206,4 +206,69 @@ it('refreshes repriced item options rather than applying the old numeric selecti
   expect(r.context.state).toBe('SELECT_MENU');
   expect(r.text).toContain('Rp25.000');
   expect(r.text).toContain('telah berubah');
+});
+
+it.each([
+  ['Hai', 'start'],
+  ['halo!', 'start'],
+  ['Hello 👋', 'start'],
+  ['P', 'start'],
+  ['Menu.', 'start'],
+  ['lihat keranjang', 'cart'],
+  ['?', 'help'],
+  ['cek pembayaran', 'check'],
+  ['Kembali', 'back'],
+])('parses the friendly alias %s', (text, kind) => {
+  expect(parseCommand(text)).toEqual({ kind });
+});
+it.each(['1.', '1)', '#1', ' 1 '])('parses %s as option 1', (text) => {
+  expect(parseCommand(text)).toEqual({ kind: 'select', value: 1 });
+});
+it.each(['mau pesan', '2', '0', 'nasi goreng'])(
+  'opens the tenant list from IDLE for %s instead of a dead end',
+  async (text) => {
+    const f = fixtures();
+    const r = await advance(idle(), text, f.catalog);
+    expect(r.context.state).toBe('SELECT_TENANT');
+    expect(r.text).toContain('1. Tenant fixture');
+  },
+);
+it('describes the real ordering journey in help', async () => {
+  const f = fixtures();
+  const text = (await advance(idle(), 'Bantuan', f.catalog)).text;
+  expect(text).toContain('*Keranjang*');
+  expect(text).not.toContain('belum tersedia');
+});
+it('asks for quantity right after choosing an item and goes back to the menu list', async () => {
+  const f = fixtures();
+  (f.catalog.menu as unknown as { get: unknown }).get = vi.fn(
+    async () => f.item,
+  );
+  const carts = {
+    service: { getCart: vi.fn(async () => null), maxQuantity: 20 },
+    scope: { customerId: randomUUID(), sessionId: randomUUID() },
+  } as never;
+  let c = (await transition(idle(), parseCommand('hi'), f.catalog, {}, carts))
+    .context;
+  c = (await transition(c, parseCommand('1'), f.catalog, {}, carts)).context;
+  c = (await transition(c, parseCommand('1'), f.catalog, {}, carts)).context;
+  expect(c.state).toBe('SELECT_MENU');
+  const quantity = await transition(c, parseCommand('1'), f.catalog, {}, carts);
+  expect(quantity.context.state).toBe('SELECT_QUANTITY');
+  expect(quantity.context.selectedMenuItemId).toBe(f.item.id);
+  expect(quantity.text).toContain('Rp20.000');
+  expect(quantity.text).toContain('Contoh');
+  expect(quantity.text).toContain('berapa porsi');
+  expect(quantity.text).not.toContain('Tambah ke Keranjang');
+  const back = await transition(
+    quantity.context,
+    parseCommand('0'),
+    f.catalog,
+    {},
+    carts,
+  );
+  expect(back.context.state).toBe('SELECT_MENU');
+  expect(back.context.selectedMenuItemId).toBeNull();
+  expect(back.text).toContain('1. Menu fixture');
+  expect(back.text).not.toContain('Tampilan diperbarui');
 });

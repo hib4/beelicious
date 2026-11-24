@@ -449,8 +449,8 @@ async function conversation() {
     await send(String(number));
     await send('1');
     const menu = (await session()).stateData as { options: string[] };
+    // Choosing an item opens its quantity prompt directly.
     await send(String(menu.options.indexOf(f.item.id) + 1));
-    await send('1');
   };
   return {
     ...f,
@@ -486,12 +486,11 @@ it('runs quantity, review, edit, remove, READY and reopen conversation states', 
   await f.send('1');
   expect((await f.session()).state).toBe('CART_EDIT_QUANTITY_INPUT');
   expect(await f.send('3')).toContain('Rp60.000');
-  expect(await f.send('4')).toContain('belum menjadi pesanan');
+  expect(await f.send('4')).toContain('Pilihanmu tersimpan');
   expect((await f.session()).state).toBe('CART_READY');
-  await f.send('1');
-  expect((await f.session()).state).toBe('CART_CONFIRM_REOPEN');
-  await f.send('1');
+  expect(await f.send('1')).toContain('Keranjang dibuka kembali');
   expect((await f.session()).state).toBe('CART_REVIEW');
+  expect((await f.service.getCart(f.scope))!.status).toBe('ACTIVE');
   await f.send('3');
   expect((await f.session()).state).toBe('CART_REMOVE_ITEM');
   expect(await f.send('1')).toContain('masih kosong');
@@ -722,7 +721,7 @@ it('reuses a prepared quantity response after pre-send recovery without repeatin
   ).toBe(1);
   await db.whatsappEvents.finish(retry.id, 'recovered', { state: 'completed' });
 });
-it('recovers an unavailable quantity selection and preserves a READY cart until explicit reopening', async () => {
+it('recovers an unavailable quantity selection and preserves a READY cart until the customer edits', async () => {
   const f = await conversation();
   await f.enterItem();
   await client.menuItem.update({
@@ -741,12 +740,18 @@ it('recovers an unavailable quantity selection and preserves a READY cart until 
   await f.send('3');
   expect((await f.session()).state).toBe('CART_READY');
   await f.enterItem();
-  expect((await f.session()).state).toBe('CART_CONFIRM_REOPEN');
-  await f.send('0');
+  expect((await f.session()).state).toBe('SELECT_QUANTITY');
   expect((await f.service.getCart(f.scope))!.status).toBe('READY');
-  await f.send('1');
-  await f.send('1');
-  expect((await f.service.getCart(f.scope))!.status).toBe('ACTIVE');
+  await f.send('0');
+  expect((await f.session()).state).toBe('SELECT_MENU');
+  expect((await f.service.getCart(f.scope))!.status).toBe('READY');
+  const menu = (await f.session()).stateData as { options: string[] };
+  await f.send(String(menu.options.indexOf(f.item.id) + 1));
+  expect((await f.session()).state).toBe('SELECT_QUANTITY');
+  expect(await f.send('2')).toContain('berhasil ditambahkan');
+  const cart = await f.service.getCart(f.scope);
+  expect(cart!.status).toBe('ACTIVE');
+  expect(cart!.items.find((i) => i.menuItemId === f.item.id)?.quantity).toBe(3);
 });
 it('rejects stale clear confirmation after a concurrent cart change', async () => {
   const f = await conversation();

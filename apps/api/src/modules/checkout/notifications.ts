@@ -23,6 +23,10 @@ export function createCheckoutWorker(
   let timer: ReturnType<typeof setTimeout> | undefined;
   let active: Promise<void> | undefined;
   let stopping = false;
+  let started = false;
+  let wakeRequested = false;
+  // True when the last run delivered something, so queued notifications drain quickly.
+  let claimedLast = false;
   const controller = new AbortController();
   async function deliver() {
     const adapter = getAdapter();
@@ -59,6 +63,7 @@ export function createCheckoutWorker(
       });
     });
     if (!row) return;
+    claimedLast = true;
     const finish = (state: string) =>
       db.checkoutNotification.updateMany({
         where: { id: row.id, leaseToken: token },
@@ -201,6 +206,7 @@ export function createCheckoutWorker(
     }
   }
   async function run() {
+    claimedLast = false;
     try {
       await payments?.tick();
       await deliver();
@@ -208,18 +214,35 @@ export function createCheckoutWorker(
       warn('checkout_worker_failed');
     }
   }
-  function schedule() {
+  function schedule(delay = 1000) {
     if (!stopping)
       timer = setTimeout(() => {
+        timer = undefined;
         active = run().finally(() => {
           active = undefined;
-          schedule();
+          const again = claimedLast || wakeRequested;
+          wakeRequested = false;
+          schedule(again ? 0 : 1000);
         });
-      }, 1000);
+      }, delay);
   }
   return {
     start() {
-      if (!timer && !stopping) schedule();
+      if (started || stopping) return;
+      started = true;
+      schedule();
+    },
+    /** Run soon instead of waiting for the idle interval. */
+    wake() {
+      if (stopping) return;
+      if (active) {
+        wakeRequested = true;
+        return;
+      }
+      if (timer) {
+        clearTimeout(timer);
+        schedule(0);
+      }
     },
     async tick() {
       if (!active && !stopping) {

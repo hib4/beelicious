@@ -1,4 +1,5 @@
 import {
+  paidCommands,
   paymentInstructions,
   paymentHelp,
   paymentStatusMessage,
@@ -10,7 +11,8 @@ import { OrderService, type CheckoutScope } from '../checkout/orders.js';
 import { PickupSlotService, pickupLabel } from '../checkout/pickup.js';
 import { CartService, type LockedCartSession } from '../cart/service.js';
 import { DomainError } from '../catalog/validation.js';
-import { initialData, rupiah, type Context } from './flow.js';
+import { createCatalogServices } from '../catalog/services.js';
+import { idle, initialData, rupiah, transition, type Context } from './flow.js';
 import type { Command } from './commands.js';
 export interface CheckoutDependencies {
   tx: Prisma.TransactionClient;
@@ -64,7 +66,8 @@ export async function checkoutTransition(
         )
       : '';
 
-  if (command.kind === 'help')
+  // Without an order in play, browsing help explains the whole journey instead.
+  if (command.kind === 'help' && (unresolved || (ownedFlow && current)))
     return {
       context: c,
       text:
@@ -97,7 +100,7 @@ export async function checkoutTransition(
       unresolved && !available
         ? paymentMessage()
         : c.state === 'ORDER_CONFIRMED'
-          ? '✅ Pembayaran terverifikasi. Persiapan tenant belum dikonfirmasi.\n\n1. Pesan Lagi'
+          ? `✅ Pembayaran terverifikasi. Persiapan tenant belum dikonfirmasi.\n\n${paidCommands}`
           : c.state === 'REQUIRES_REVIEW'
             ? 'Pembayaran/pickup memerlukan pemeriksaan. Jangan membayar ulang. Pemenuhan dan pengembalian dana belum dapat dijanjikan.'
             : c.state === 'PAYMENT_UNSUCCESSFUL'
@@ -180,11 +183,13 @@ export async function checkoutTransition(
       'SELECT_CATEGORY',
       'SELECT_MENU',
       'VIEW_MENU_ITEM',
+      'SELECT_QUANTITY',
     ].includes(c.state);
     const addingItem =
-      c.state === 'VIEW_MENU_ITEM' &&
-      command.kind === 'select' &&
-      command.value === 1;
+      (c.state === 'VIEW_MENU_ITEM' &&
+        command.kind === 'select' &&
+        command.value === 1) ||
+      (c.state === 'SELECT_QUANTITY' && command.kind === 'select');
     if (browsing && !addingItem && command.kind !== 'cart') return null;
     if (addingItem)
       return {
@@ -203,13 +208,25 @@ export async function checkoutTransition(
       'AWAITING_PAYMENT',
     ].includes(c.state)
   ) {
-    if (command.kind === 'start' || command.kind === 'cancel') return null;
+    if (command.kind === 'cancel') return null;
+    // A verified order is finished for the customer: continue from the tenant list.
+    if (current?.status === 'CONFIRMED') {
+      if (command.kind === 'cart') return null;
+      return await transition(
+        idle(),
+        { kind: 'start' },
+        createCatalogServices(d.tx),
+        {},
+        { service: carts, scope: d.scope },
+      );
+    }
+    if (command.kind === 'start') return null;
     if (
       !refresh &&
       command.kind === 'select' &&
       command.value === 1 &&
       current &&
-      ['CANCELLED', 'EXPIRED', 'CONFIRMED'].includes(current.status)
+      ['CANCELLED', 'EXPIRED'].includes(current.status)
     ) {
       try {
         const cart = await orders.copyToNewCart(d.scope, current.id);
@@ -322,7 +339,7 @@ export async function checkoutTransition(
         c.data = initialData();
         return {
           context: c,
-          text: `Checkout ${order.orderNumber} tersimpan.\nTotal: ${rupiah(order.totalAmount)}\n\nInstruksi pembayaran sedang disiapkan. Kirim CEK untuk status. BATAL untuk meminta pembatalan.`,
+          text: `🧾 Pesanan ${order.orderNumber} dibuat.\nTotal: ${rupiah(order.totalAmount)}\n\nQR pembayaran segera dikirim.\n\n*CEK* — Periksa pembayaran\n*BATAL* — Minta pembatalan`,
         };
       } catch (e) {
         if (!(e instanceof DomainError)) throw e;

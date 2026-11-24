@@ -12,6 +12,8 @@ import { GREETING, MessagingError, type MessagingAdapter } from './types.js';
 export interface Worker {
   start(): void;
   tick(): Promise<void>;
+  /** Poll now instead of waiting for the idle interval (e.g. after ingress). */
+  wake(): void;
   stop(): Promise<void>;
 }
 export interface WorkMessage {
@@ -26,6 +28,8 @@ export interface WorkerPolicy {
   conversation?: ConversationHandler | undefined;
   scope(): EventScope | undefined;
   decode(data: unknown): WorkMessage | undefined;
+  /** Called after a claimed event was handled, e.g. to wake dependent workers. */
+  processed?(): void;
 }
 export function createInboxWorker(
   store: WhatsAppEventStore,
@@ -38,6 +42,10 @@ export function createInboxWorker(
   let active: Promise<void> | undefined;
   let stopping = false;
   let started = false;
+  let polling = false;
+  let wakeRequested = false;
+  // True when the last run claimed work, so the queue drains without idle waits.
+  let claimedLast = false;
   const controller = new AbortController();
   async function run() {
     const scope = policy.scope();
@@ -45,6 +53,7 @@ export function createInboxWorker(
     const token = randomUUID();
     const event = await store.claim(now(), token, scope);
     if (!event) return;
+    claimedLast = true;
     const finish = (result: Parameters<WhatsAppEventStore['finish']>[2]) =>
       store.finish(event.id, token, result);
     if (event.kind === 'status') {
@@ -160,21 +169,34 @@ export function createInboxWorker(
   function tick(): Promise<void> {
     if (stopping) return Promise.resolve();
     if (active) return active;
+    claimedLast = false;
     active = run()
       .catch(() => {
         warn('whatsapp_worker_storage_failure');
       })
       .finally(() => {
         active = undefined;
+        if (claimedLast) policy.processed?.();
       });
     return active;
   }
   async function poll() {
-    await tick();
+    polling = true;
+    timer = undefined;
+    try {
+      await tick();
+    } finally {
+      polling = false;
+    }
     if (!stopping) {
-      timer = setTimeout(() => {
-        void poll();
-      }, 1000);
+      const again = claimedLast || wakeRequested;
+      wakeRequested = false;
+      timer = setTimeout(
+        () => {
+          void poll();
+        },
+        again ? 0 : 1000,
+      );
       timer.unref();
     }
   }
@@ -186,6 +208,15 @@ export function createInboxWorker(
       }
     },
     tick,
+    wake() {
+      if (!started || stopping) return;
+      if (polling) {
+        wakeRequested = true;
+        return;
+      }
+      if (timer) clearTimeout(timer);
+      void poll();
+    },
     async stop() {
       stopping = true;
       if (timer) clearTimeout(timer);

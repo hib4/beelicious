@@ -74,6 +74,8 @@ it('keeps help and successful payment wording natural without claiming pickup re
   expect(paid).toContain('Pembayaran terverifikasi');
   expect(paid).toContain('Persiapan oleh tenant belum dikonfirmasi');
   expect(paid).toContain('belum dinyatakan siap diambil');
+  for (const command of ['*Menu*', '*Keranjang*', '*CEK*', '*Bantuan*'])
+    expect(paid).toContain(command);
 });
 it('retains explicit nonpayable labels for the independent mock gateway', () => {
   for (const message of [

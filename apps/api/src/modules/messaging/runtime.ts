@@ -26,6 +26,7 @@ export function createMessagingRuntime(
     adapterFactory?: (callbacks: AdapterCallbacks) => Promise<MessagingAdapter>;
     now?: () => Date;
     qr?: (value: string) => void;
+    processed?: () => void;
   } = {},
 ): MessagingRuntime {
   let adapter: MessagingAdapter | undefined;
@@ -33,8 +34,13 @@ export function createMessagingRuntime(
   let startup: Promise<void> | undefined;
   let stopping = false;
   const callbacks: AdapterCallbacks = {
-    receive: async (messages) =>
-      store.receive(incomingEvents(messages, !!dependencies.conversation)),
+    receive: async (messages) => {
+      await store.receive(
+        incomingEvents(messages, !!dependencies.conversation),
+      );
+      // Committed ingress is processed immediately rather than on the next poll.
+      worker?.wake();
+    },
     delivery: async (updates) => store.receive(deliveryEvents(updates)),
     warn,
   };
@@ -64,6 +70,9 @@ export function createMessagingRuntime(
       {
         enabled: development && config.testBotEnabled,
         conversation: dependencies.conversation,
+        ...(dependencies.processed
+          ? { processed: dependencies.processed }
+          : {}),
         scope: () => {
           const accountId = active.accountId();
           return accountId
