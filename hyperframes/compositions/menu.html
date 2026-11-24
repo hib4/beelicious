@@ -1,0 +1,56 @@
+<template>
+  <style>
+    @font-face { font-family: "Plus Jakarta Sans"; src: url("assets/fonts/plus-jakarta-sans.woff2") format("woff2"); font-weight: 200 800; font-display: block; }
+    @font-face { font-family: "Inter"; src: url("assets/fonts/inter.woff2") format("woff2"); font-weight: 100 900; font-display: block; }
+    #root { position: absolute; inset: 0; overflow: hidden; background: #FDC43D; }
+    #menu-prompt {
+      position: absolute; left: 96px; top: 96px; padding: 26px 36px 30px; border-radius: 20px;
+      background: #1D1B1B; color: #FFF9EF; font: 600 48px/1.25 "Inter"; letter-spacing: -0.01em; opacity: 0;
+    }
+    #menu-prompt .who { display: block; font-size: 30px; color: #D7CABC; margin-bottom: 8px; }
+    #menu-window { position: absolute; left: 96px; top: 330px; width: 1000px; height: 600px; overflow: hidden; }
+    #menu-strip { position: absolute; left: 0; top: 0; width: 1000px; }
+    .menu-item { height: 600px; padding-top: 20px; color: #1D1B1B; }
+    .menu-item .no { display: block; font: 700 56px/1 "Inter"; font-variant-numeric: tabular-nums; margin-bottom: 18px; }
+    .menu-item .name { display: block; font: 800 136px/0.9 "Plus Jakarta Sans"; letter-spacing: -0.045em; word-spacing: 0.1em; }
+    .menu-item .price { display: block; margin-top: 34px; font: 700 84px/1 "Inter"; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+    #menu-num {
+      position: absolute; right: 60px; top: -131px; margin: 0;
+      font: 800 1250px/1 "Plus Jakarta Sans"; letter-spacing: -0.05em; color: #1D1B1B; opacity: 0;
+    }
+    #menu-dip { position: absolute; inset: 0; background: #1D1B1B; opacity: 0; }
+  </style>
+  <div id="root" data-composition-id="menu" data-width="1920" data-height="1080"
+       data-composition-variables='[{"id":"dishName","type":"string","label":"Chosen dish (illustrative)","default":"Bakmi Ayam Pangsit"},{"id":"dishPrice","type":"string","label":"Dish price","default":"Rp30.000"}]'>
+    <div id="menu-prompt"><span class="who">Beelicious</span>Bakmi · Bakmi Effata</div>
+    <div id="menu-window" data-layout-allow-overflow>
+      <div id="menu-strip">
+        <div class="menu-item" data-layout-ignore><span class="no">1.</span><span class="name">Bakmi<br />Ayam</span><span class="price">Rp25.000</span></div>
+        <div class="menu-item" data-layout-ignore><span class="no">2.</span><span class="name">Bakmi Ayam<br />Pangsit</span><span class="price">Rp30.000</span></div>
+        <div class="menu-item" data-layout-ignore><span class="no">3.</span><span class="name">Bakmi Ayam<br />Jamur</span><span class="price">Rp28.000</span></div>
+        <div class="menu-item" data-layout-ignore><span class="no">4.</span><span class="name">Kwetiau<br />Goreng Ayam</span><span class="price">Rp28.000</span></div>
+        <div class="menu-item" data-layout-ignore><span class="no">1.</span><span class="name">Bakmi<br />Ayam</span><span class="price">Rp25.000</span></div>
+        <div class="menu-item"><span class="no">2.</span><span class="name" data-var-text="dishName">Bakmi Ayam Pangsit</span><span class="price" data-var-text="dishPrice">Rp30.000</span></div>
+      </div>
+    </div>
+    <div id="menu-num" data-layout-bleed="true" data-layout-allow-overflow>2</div>
+    <div id="menu-dip"></div>
+  </div>
+  <script>
+    (function () {
+      const B = 30 / 60; // one beat: 120 BPM at 60 fps
+      const tl = gsap.timeline({ paused: true });
+      tl.set("#menu-strip", { y: 0, filter: "blur(0px)" }, 0);
+      tl.fromTo("#menu-prompt", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.15, ease: "power4.out", immediateRender: false }, 0.03);
+      // the menu rolls like a slot machine and lands on item 2 on beat 2
+      tl.fromTo("#menu-strip", { y: 0 }, { y: -3000, duration: B - 0.02, ease: "power3.out", immediateRender: false }, 0.02);
+      tl.fromTo("#menu-strip", { filter: "blur(0px)" }, { keyframes: [{ filter: "blur(14px)", duration: 0.08 }, { filter: "blur(0px)", duration: B - 0.12 }], ease: "power2.out", immediateRender: false }, 0.02);
+      // beat 2 — reply "2"
+      tl.fromTo("#menu-num", { opacity: 0, scale: 1.22, filter: "blur(14px)" }, { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.18, ease: "expo.out", immediateRender: false }, B);
+      // dip cut on the bar line
+      tl.fromTo("#menu-dip", { opacity: 0 }, { opacity: 0.4, duration: 0.05, ease: "none", immediateRender: false }, 4 * B - 0.05);
+      window.__timelines = window.__timelines || {};
+      window.__timelines["menu"] = tl;
+    })();
+  </script>
+</template>

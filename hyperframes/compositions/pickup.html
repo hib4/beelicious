@@ -1,0 +1,61 @@
+<template>
+  <style>
+    @font-face { font-family: "Plus Jakarta Sans"; src: url("assets/fonts/plus-jakarta-sans.woff2") format("woff2"); font-weight: 200 800; font-display: block; }
+    @font-face { font-family: "Inter"; src: url("assets/fonts/inter.woff2") format("woff2"); font-weight: 100 900; font-display: block; }
+    #root { position: absolute; inset: 0; overflow: hidden; background: #FDC43D; }
+    #pik-prompt {
+      position: absolute; left: 96px; top: 96px; padding: 26px 36px 30px; border-radius: 20px;
+      background: #1D1B1B; color: #FFF9EF; font: 600 48px/1.25 "Inter"; letter-spacing: -0.01em; opacity: 0;
+    }
+    #pik-prompt .who { display: block; font-size: 30px; color: #D7CABC; margin-bottom: 8px; }
+    #pik-list { position: absolute; left: 96px; top: 360px; }
+    .pik-row {
+      display: block; margin-left: -24px; padding: 12px 24px; border-radius: 14px; margin-bottom: 14px;
+      font: 700 72px/1.1 "Inter"; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: #1D1B1B; opacity: 0;
+    }
+    #pik-r1 { background: transparent; }
+    #pik-big {
+      position: absolute; left: 82px; top: 330px; margin: 0; white-space: nowrap;
+      font: 800 380px/0.9 "Plus Jakarta Sans"; letter-spacing: -0.05em; color: #1D1B1B; font-variant-numeric: tabular-nums; opacity: 0;
+    }
+    #pik-label { position: absolute; left: 96px; top: 720px; font: 700 64px/1.1 "Inter"; letter-spacing: -0.02em; color: #1D1B1B; opacity: 0; }
+    #pik-num {
+      position: absolute; right: 130px; top: -215px; margin: 0;
+      font: 800 1400px/1 "Plus Jakarta Sans"; letter-spacing: -0.05em; color: #1D1B1B; opacity: 0;
+    }
+    #pik-dip { position: absolute; inset: 0; background: #1D1B1B; opacity: 0; }
+  </style>
+  <div id="root" data-composition-id="pickup" data-width="1920" data-height="1080"
+       data-composition-variables='[{"id":"pickupTime","type":"string","label":"Pickup time (illustrative)","default":"12.15"}]'>
+    <div id="pik-prompt"><span class="who">Beelicious</span>Pilih Waktu Pickup:</div>
+    <div id="pik-list">
+      <span id="pik-r1" class="pik-row">1. 12.15 WIB</span>
+      <span id="pik-r2" class="pik-row">2. 12.30 WIB</span>
+      <span id="pik-r3" class="pik-row">3. 12.45 WIB</span>
+    </div>
+    <h2 id="pik-big" data-var-text="pickupTime">12.15</h2>
+    <div id="pik-label">Pickup · Bakmi Effata</div>
+    <div id="pik-num" data-layout-bleed="true" data-layout-allow-overflow>1</div>
+    <div id="pik-dip"></div>
+  </div>
+  <script>
+    (function () {
+      const B = 30 / 60; // one beat: 120 BPM at 60 fps
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo("#pik-prompt", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.15, ease: "power4.out", immediateRender: false }, 0.03);
+      tl.fromTo(".pik-row", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.15, ease: "power4.out", stagger: 0.067, immediateRender: false }, 0.08);
+      // beat 2 — reply "1", row 1 inverts
+      tl.fromTo("#pik-num", { opacity: 0, scale: 1.22, filter: "blur(14px)" }, { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.18, ease: "expo.out", immediateRender: false }, B);
+      tl.fromTo("#pik-r1", { backgroundColor: "rgba(29,27,27,0)", color: "#1D1B1B" }, { backgroundColor: "rgba(29,27,27,1)", color: "#FFF9EF", duration: 0.12, ease: "power2.out", immediateRender: false }, B + 0.06);
+      tl.fromTo("#pik-r2, #pik-r3", { opacity: 1 }, { opacity: 0.3, duration: 0.2, ease: "power2.out", immediateRender: false }, B + 0.06);
+      // beat 3 — the chosen time becomes the headline
+      tl.fromTo(".pik-row", { filter: "blur(0px)" }, { opacity: 0, filter: "blur(8px)", duration: 0.12, ease: "power3.in", immediateRender: false }, 2 * B - 0.1);
+      tl.fromTo("#pik-big", { opacity: 0, scale: 1.12, filter: "blur(12px)", transformOrigin: "0% 50%" }, { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.2, ease: "expo.out", immediateRender: false }, 2 * B);
+      tl.fromTo("#pik-label", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.15, ease: "power4.out", immediateRender: false }, 2 * B + 0.02);
+      // dip cut on the bar line
+      tl.fromTo("#pik-dip", { opacity: 0 }, { opacity: 0.4, duration: 0.05, ease: "none", immediateRender: false }, 4 * B - 0.05);
+      window.__timelines = window.__timelines || {};
+      window.__timelines["pickup"] = tl;
+    })();
+  </script>
+</template>

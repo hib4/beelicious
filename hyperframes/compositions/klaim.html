@@ -1,0 +1,36 @@
+<template>
+  <style>
+    @font-face { font-family: "Plus Jakarta Sans"; src: url("assets/fonts/plus-jakarta-sans.woff2") format("woff2"); font-weight: 200 800; font-display: block; }
+    #root { position: absolute; inset: 0; overflow: hidden; background: #FDC43D; }
+    #kla-content { position: absolute; inset: 0; }
+    .kla-line {
+      position: absolute; left: 90px; margin: 0; white-space: nowrap;
+      font: 800 205px/0.9 "Plus Jakarta Sans"; letter-spacing: -0.045em; word-spacing: 0.12em; color: #1D1B1B;
+    }
+    .kla-line span { display: inline-block; opacity: 0; }
+    #kla-l1 { top: 240px; } #kla-l2 { top: 470px; }
+    #kla-drop { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; background: #1D1B1B; }
+  </style>
+  <div id="root" data-composition-id="klaim" data-width="1920" data-height="1080">
+    <div id="kla-content">
+      <h2 id="kla-l1" class="kla-line"><span>Pesan</span> <span>duluan.</span></h2>
+      <h2 id="kla-l2" class="kla-line"><span>Ambil</span> <span>pas</span> <span>jamnya.</span></h2>
+    </div>
+    <div id="kla-drop" data-layout-ignore></div>
+  </div>
+  <script>
+    (function () {
+      const B = 30 / 60; // one beat: 120 BPM at 60 fps
+      const tl = gsap.timeline({ paused: true });
+      tl.set("#kla-drop", { y: -1080 }, 0);
+      tl.fromTo("#kla-l1 span", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.15, ease: "power4.out", stagger: 0.09, immediateRender: false }, 0.02);
+      tl.fromTo("#kla-l2 span", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.15, ease: "power4.out", stagger: 0.09, immediateRender: false }, B);
+      // end — charcoal drops from the top
+      const w = 4 * B - 0.27;
+      tl.fromTo("#kla-content", { y: 0, filter: "blur(0px)" }, { y: 260, filter: "blur(20px)", duration: 0.27, ease: "power3.in", immediateRender: false }, w);
+      tl.fromTo("#kla-drop", { y: -1080 }, { y: 0, duration: 0.27, ease: "power3.in", immediateRender: false }, w);
+      window.__timelines = window.__timelines || {};
+      window.__timelines["klaim"] = tl;
+    })();
+  </script>
+</template>

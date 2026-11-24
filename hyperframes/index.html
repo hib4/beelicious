@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <title>Beelicious — Balas Angka</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #FDC43D; }
+      #root { position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+    </style>
+  </head>
+  <body>
+    <!-- Beelicious · "Balas Angka" — 13 bars at 120 BPM (1 beat = 30 frames, 1 bar = 120 frames at 60 fps), loops on itself.
+         The bed drops out for one beat before the Rp60.000 slam and from "0 Kembali" until the loop zoom lands. -->
+    <div id="root" data-composition-id="main" data-start="0" data-duration="26.000000" data-fps="60" data-width="1920" data-height="1080">
+      <div id="hook" class="clip" data-composition-id="hook" data-composition-src="compositions/hook.html" data-start="0.000000" data-duration="2.000000" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="whatsapp" class="clip" data-composition-id="whatsapp" data-composition-src="compositions/whatsapp.html" data-start="2.000000" data-duration="2.000000" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="tenant" class="clip" data-composition-id="tenant" data-composition-src="compositions/tenant.html" data-start="4.000000" data-duration="2.000000" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="kategori" class="clip" data-composition-id="kategori" data-composition-src="compositions/kategori.html" data-start="6.000000" data-duration="2.000000" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="menu" class="clip" data-composition-id="menu" data-composition-src="compositions/menu.html" data-start="8.000000" data-duration="2.000000" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="porsi" class="clip" data-composition-id="porsi" data-composition-src="compositions/porsi.html" data-start="10.000000" data-duration="2.000000" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="keranjang" class="clip" data-composition-id="keranjang" data-composition-src="compositions/keranjang.html" data-start="12.000000" data-duration="2.000000" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="pickup" class="clip" data-composition-id="pickup" data-composition-src="compositions/pickup.html" data-start="14.000000" data-duration="2.000000" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="bayar" class="clip" data-composition-id="bayar" data-composition-src="compositions/bayar.html" data-start="16.000000" data-duration="2.000000" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="lunas" class="clip" data-composition-id="lunas" data-composition-src="compositions/lunas.html" data-start="18.000000" data-duration="2.000000" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="klaim" class="clip" data-composition-id="klaim" data-composition-src="compositions/klaim.html" data-start="20.000000" data-duration="2.000000" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="akhir" class="clip" data-composition-id="akhir" data-composition-src="compositions/akhir.html" data-start="22.000000" data-duration="4.000000" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <audio id="bgm" src="assets/audio/bed-loop.wav" data-start="0" data-duration="26.000000" data-track-index="2" data-volume="1"
+        data-automation='{"version":1,"lanes":[{"target":"volume","points":[{"t":0,"v":1},{"t":15.98,"v":1},{"t":16.0,"v":0},{"t":16.48,"v":0},{"t":16.5,"v":1},{"t":24.48,"v":1},{"t":24.5,"v":0},{"t":25.59,"v":0},{"t":25.61,"v":1}]}]}'></audio>
+      <audio id="sfx-halo" src="assets/sfx/tick.mp3" data-start="1.017" data-duration="0.238" data-track-index="3" data-volume="0.55"></audio>
+      <audio id="sfx-w1" src="assets/sfx/whoosh.mp3" data-start="1.941" data-duration="0.44" data-track-index="3" data-volume="0.45"></audio>
+      <audio id="sfx-wa" src="assets/sfx/tick.mp3" data-start="2.517" data-duration="0.238" data-track-index="3" data-volume="0.55"></audio>
+      <audio id="sfx-n1" src="assets/sfx/key.mp3" data-start="4.441" data-duration="0.4" data-track-index="3" data-volume="0.6"></audio>
+      <audio id="sfx-w2" src="assets/sfx/whoosh.mp3" data-start="5.941" data-duration="0.44" data-track-index="3" data-volume="0.45"></audio>
+      <audio id="sfx-n2" src="assets/sfx/tick.mp3" data-start="6.517" data-duration="0.238" data-track-index="3" data-volume="0.55"></audio>
+      <audio id="sfx-w3" src="assets/sfx/whoosh.mp3" data-start="7.941" data-duration="0.44" data-track-index="3" data-volume="0.45"></audio>
+      <audio id="sfx-n3" src="assets/sfx/key.mp3" data-start="8.441" data-duration="0.4" data-track-index="3" data-volume="0.6"></audio>
+      <audio id="sfx-n4" src="assets/sfx/tick.mp3" data-start="10.517" data-duration="0.238" data-track-index="3" data-volume="0.55"></audio>
+      <audio id="sfx-w4" src="assets/sfx/whoosh.mp3" data-start="11.941" data-duration="0.44" data-track-index="3" data-volume="0.45"></audio>
+      <audio id="sfx-n5" src="assets/sfx/key.mp3" data-start="12.441" data-duration="0.4" data-track-index="3" data-volume="0.6"></audio>
+      <audio id="sfx-n6" src="assets/sfx/tick.mp3" data-start="14.517" data-duration="0.238" data-track-index="3" data-volume="0.55"></audio>
+      <audio id="sfx-pop" src="assets/sfx/pop.mp3" data-start="18.418" data-duration="0.2" data-track-index="3" data-volume="0.5"></audio>
+      <audio id="sfx-w7" src="assets/sfx/whoosh.mp3" data-start="19.941" data-duration="0.44" data-track-index="3" data-volume="0.45"></audio>
+      <audio id="sfx-w5" src="assets/sfx/whoosh.mp3" data-start="21.941" data-duration="0.44" data-track-index="3" data-volume="0.45"></audio>
+      <audio id="sfx-n7" src="assets/sfx/key.mp3" data-start="24.441" data-duration="0.4" data-track-index="3" data-volume="0.6"></audio>
+      <audio id="sfx-w6" src="assets/sfx/whoosh.mp3" data-start="25.551" data-duration="0.44" data-track-index="3" data-volume="0.45"></audio>
+      <audio id="sfx-riser" src="assets/sfx/riser.mp3" data-start="13.045" data-duration="3.47" data-track-index="4" data-volume="0.55" data-fade-in="0.6"></audio>
+      <audio id="sfx-impact" src="assets/sfx/impact.mp3" data-start="16.416" data-duration="2.2" data-track-index="5" data-volume="0.8" data-fade-out="0.6"></audio>
+    </div>
+    <script>
+      window.__timelines = window.__timelines || {};
+      window.__timelines["main"] = gsap.timeline({ paused: true });
+    </script>
+  </body>
+</html>

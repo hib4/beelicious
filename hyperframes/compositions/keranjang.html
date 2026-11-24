@@ -1,0 +1,54 @@
+<template>
+  <style>
+    @font-face { font-family: "Plus Jakarta Sans"; src: url("assets/fonts/plus-jakarta-sans.woff2") format("woff2"); font-weight: 200 800; font-display: block; }
+    @font-face { font-family: "Inter"; src: url("assets/fonts/inter.woff2") format("woff2"); font-weight: 100 900; font-display: block; }
+    #root { position: absolute; inset: 0; overflow: hidden; background: #FFFBF3; }
+    #ker-card {
+      position: absolute; left: 96px; top: 120px; width: 980px; padding: 52px 60px 44px;
+      background: #FFFFFF; border: 3px solid #E6DACB; border-radius: 20px; color: #1D1B1B; opacity: 0;
+    }
+    #ker-card .who { display: block; font: 600 30px/1.2 "Inter"; color: #776D62; margin-bottom: 14px; }
+    #ker-card .title { display: block; font: 800 88px/1 "Plus Jakarta Sans"; letter-spacing: -0.04em; word-spacing: 0.1em; }
+    #ker-card .sub { display: block; margin-top: 18px; font: 700 60px/1.1 "Inter"; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+    #ker-card .ask { display: block; margin-top: 34px; font: 500 44px/1.3 "Inter"; color: #352F2A; }
+    .ker-opt { position: relative; display: block; margin: 10px 0 0 -20px; padding: 8px 20px; font: 600 50px/1.2 "Inter"; font-variant-numeric: tabular-nums; }
+    .ker-opt span { position: relative; }
+    #ker-bar { position: absolute; inset: 0; background: #FDC43D; border-radius: 14px; transform-origin: 0% 50%; }
+    #ker-num {
+      position: absolute; right: 60px; top: -131px; margin: 0;
+      font: 800 1250px/1 "Plus Jakarta Sans"; letter-spacing: -0.05em; color: #1D1B1B; opacity: 0;
+    }
+    #ker-iris { position: absolute; inset: 0; background: #FDC43D; }
+  </style>
+  <div id="root" data-composition-id="keranjang" data-width="1920" data-height="1080"
+       data-composition-variables='[{"id":"subtotal","type":"string","label":"Subtotal","default":"Rp60.000"}]'>
+    <div id="ker-card">
+      <span class="who">Beelicious</span>
+      <span class="title">Keranjang: 2 porsi</span>
+      <span class="sub">Subtotal <span data-var-text="subtotal">Rp60.000</span></span>
+      <span class="ask">Mau tambah menu lainnya?</span>
+      <div class="ker-opt"><span>1. Tambah Menu</span></div>
+      <div class="ker-opt"><span>2. Lihat Keranjang</span></div>
+      <div class="ker-opt"><div id="ker-bar"></div><span>3. Lanjut Pembayaran</span></div>
+    </div>
+    <div id="ker-num" data-layout-bleed="true" data-layout-allow-overflow>3</div>
+    <div id="ker-iris"></div>
+  </div>
+  <script>
+    (function () {
+      const B = 30 / 60; // one beat: 120 BPM at 60 fps
+      const tl = gsap.timeline({ paused: true });
+      tl.set("#ker-bar", { scaleX: 0 }, 0);
+      tl.set("#ker-iris", { clipPath: "circle(0px at 1480px 560px)" }, 0);
+      // the cart message rises into place
+      tl.fromTo("#ker-card", { opacity: 0, y: 140, filter: "blur(10px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.45, ease: "expo.out", immediateRender: false }, 0.02);
+      // beat 2 — reply "3"
+      tl.fromTo("#ker-num", { opacity: 0, scale: 1.22, filter: "blur(14px)" }, { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.18, ease: "expo.out", immediateRender: false }, B);
+      tl.fromTo("#ker-bar", { scaleX: 0 }, { scaleX: 1, duration: 0.3, ease: "expo.out", immediateRender: false }, B + 0.06);
+      // bar end — a yellow iris opens from the numeral
+      tl.fromTo("#ker-iris", { clipPath: "circle(0px at 1480px 560px)" }, { clipPath: "circle(1700px at 1480px 560px)", duration: 0.3, ease: "power3.in", immediateRender: false }, 4 * B - 0.3);
+      window.__timelines = window.__timelines || {};
+      window.__timelines["keranjang"] = tl;
+    })();
+  </script>
+</template>

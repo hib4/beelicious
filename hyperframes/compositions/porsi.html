@@ -1,0 +1,57 @@
+<template>
+  <style>
+    @font-face { font-family: "Plus Jakarta Sans"; src: url("assets/fonts/plus-jakarta-sans.woff2") format("woff2"); font-weight: 200 800; font-display: block; }
+    @font-face { font-family: "Inter"; src: url("assets/fonts/inter.woff2") format("woff2"); font-weight: 100 900; font-display: block; }
+    #root { position: absolute; inset: 0; overflow: hidden; background: #1D1B1B; }
+    #por-content { position: absolute; inset: 0; }
+    #por-prompt {
+      position: absolute; left: 960px; top: 96px; padding: 26px 36px 30px; border-radius: 20px;
+      background: #2C2724; color: #FFF9EF; font: 600 48px/1.25 "Inter"; letter-spacing: -0.01em; opacity: 0;
+    }
+    #por-prompt .who { display: block; font-size: 30px; color: #D7CABC; margin-bottom: 8px; }
+    #por-num {
+      position: absolute; left: 40px; top: -215px; margin: 0;
+      font: 800 1400px/1 "Plus Jakarta Sans"; letter-spacing: -0.05em; color: #FDC43D; opacity: 0;
+    }
+    #por-word {
+      position: absolute; left: 950px; top: 340px; margin: 0;
+      font: 800 260px/0.9 "Plus Jakarta Sans"; letter-spacing: -0.045em; color: #FFF9EF; opacity: 0;
+    }
+    #por-dish { position: absolute; left: 966px; top: 640px; font: 600 52px/1.2 "Inter"; color: #D7CABC; opacity: 0; }
+    #por-calc {
+      position: absolute; left: 966px; top: 720px; font: 700 96px/1 "Inter"; letter-spacing: -0.02em;
+      font-variant-numeric: tabular-nums; color: #FFD66B; opacity: 0;
+    }
+    #por-panel { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; background: #FFFBF3; }
+  </style>
+  <div id="root" data-composition-id="porsi" data-width="1920" data-height="1080">
+    <div id="por-content">
+      <div id="por-prompt"><span class="who">Beelicious</span>Masukkan jumlah porsi:</div>
+      <div id="por-num" data-layout-bleed="true" data-layout-allow-overflow>2</div>
+      <h2 id="por-word">PORSI</h2>
+      <div id="por-dish">Bakmi Ayam Pangsit</div>
+      <div id="por-calc">2 × Rp30.000</div>
+    </div>
+    <div id="por-panel"></div>
+  </div>
+  <script>
+    (function () {
+      const B = 30 / 60; // one beat: 120 BPM at 60 fps
+      const tl = gsap.timeline({ paused: true });
+      tl.set("#por-panel", { x: 1920 }, 0);
+      tl.fromTo("#por-prompt", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.15, ease: "power4.out", immediateRender: false }, 0.03);
+      // beat 2 — reply "2"
+      tl.fromTo("#por-num", { opacity: 0, scale: 1.22, filter: "blur(14px)" }, { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.18, ease: "expo.out", immediateRender: false }, B);
+      tl.fromTo("#por-word", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.18, ease: "power4.out", immediateRender: false }, B + 0.1);
+      tl.fromTo("#por-dish", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.15, ease: "power4.out", immediateRender: false }, B + 0.25);
+      // beat 3 — the arithmetic
+      tl.fromTo("#por-calc", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.15, ease: "power4.out", immediateRender: false }, 2 * B);
+      // bar end — horizontal whip onto parchment
+      const w = 4 * B - 0.27;
+      tl.fromTo("#por-content", { x: 0, filter: "blur(0px)" }, { x: -520, filter: "blur(22px)", duration: 0.27, ease: "power3.in", immediateRender: false }, w);
+      tl.fromTo("#por-panel", { x: 1920 }, { x: 0, duration: 0.27, ease: "power3.in", immediateRender: false }, w);
+      window.__timelines = window.__timelines || {};
+      window.__timelines["porsi"] = tl;
+    })();
+  </script>
+</template>

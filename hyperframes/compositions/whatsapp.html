@@ -1,0 +1,37 @@
+<template>
+  <style>
+    @font-face { font-family: "Plus Jakarta Sans"; src: url("assets/fonts/plus-jakarta-sans.woff2") format("woff2"); font-weight: 200 800; font-display: block; }
+    @font-face { font-family: "Inter"; src: url("assets/fonts/inter.woff2") format("woff2"); font-weight: 100 900; font-display: block; }
+    #root { position: absolute; inset: 0; overflow: hidden; background: #1D1B1B; }
+    #wa-content { position: absolute; inset: 0; }
+    #wa-line {
+      position: absolute; left: 90px; top: 170px; margin: 0; white-space: nowrap;
+      font: 800 230px/0.92 "Plus Jakarta Sans"; letter-spacing: -0.045em; word-spacing: 0.12em;
+    }
+    #wa-line span { display: inline-block; opacity: 0; }
+    #wa-w1 { color: #FFF9EF; }
+    #wa-w2 { color: #FDC43D; }
+    #wa-sub { position: absolute; left: 100px; top: 660px; font: 700 76px/1.1 "Inter"; letter-spacing: -0.02em; color: #D7CABC; opacity: 0; }
+  </style>
+  <div id="root" data-composition-id="whatsapp" data-width="1920" data-height="1080"
+       data-composition-variables='[{"id":"channelLine","type":"string","label":"Channel line","default":"Tanpa aplikasi baru."}]'>
+    <div id="wa-content">
+      <h2 id="wa-line"><span id="wa-w1">Cukup</span><br /><span id="wa-w2">WhatsApp.</span></h2>
+      <p id="wa-sub" data-var-text="channelLine">Tanpa aplikasi baru.</p>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const B = 30 / 60; // one beat: 120 BPM at 60 fps
+      const BAR = 4 * B;
+      const tl = gsap.timeline({ paused: true });
+      // the channel, on the bee-bot's dark sky: only WhatsApp
+      tl.fromTo("#wa-line span", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.15, ease: "power4.out", stagger: 0.09, immediateRender: false }, 0.04);
+      tl.fromTo("#wa-sub", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.15, ease: "power4.out", immediateRender: false }, B);
+      // blur swap on the bar line — the ground stays, the chat continues in "tenant"
+      tl.fromTo("#wa-content", { filter: "blur(0px)" }, { opacity: 0, filter: "blur(10px)", duration: 0.13, ease: "power3.in", immediateRender: false }, BAR - 0.13);
+      window.__timelines = window.__timelines || {};
+      window.__timelines["whatsapp"] = tl;
+    })();
+  </script>
+</template>

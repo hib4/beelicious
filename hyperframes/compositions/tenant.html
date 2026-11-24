@@ -1,0 +1,46 @@
+<template>
+  <style>
+    @font-face { font-family: "Plus Jakarta Sans"; src: url("assets/fonts/plus-jakarta-sans.woff2") format("woff2"); font-weight: 200 800; font-display: block; }
+    @font-face { font-family: "Inter"; src: url("assets/fonts/inter.woff2") format("woff2"); font-weight: 100 900; font-display: block; }
+    #root { position: absolute; inset: 0; overflow: hidden; background: #1D1B1B; }
+    #ten-prompt {
+      position: absolute; left: 96px; top: 96px; padding: 26px 36px 30px; border-radius: 20px;
+      background: #2C2724; color: #FFF9EF; font: 600 48px/1.25 "Inter"; letter-spacing: -0.01em; opacity: 0;
+    }
+    #ten-prompt .who { display: block; font-size: 30px; color: #D7CABC; margin-bottom: 8px; }
+    #ten-prompt .opt { display: block; font-variant-numeric: tabular-nums; }
+    #ten-num {
+      position: absolute; right: 130px; top: -215px; margin: 0;
+      font: 800 1400px/1 "Plus Jakarta Sans"; letter-spacing: -0.05em; color: #FDC43D; opacity: 0;
+    }
+    #ten-answer {
+      position: absolute; left: 96px; top: 400px; margin: 0;
+      font: 800 250px/0.88 "Plus Jakarta Sans"; letter-spacing: -0.045em; word-spacing: 0.1em; color: #FFF9EF;
+    }
+    #ten-answer span { display: inline-block; opacity: 0; }
+    #ten-cover { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; background: #FFFBF3; }
+  </style>
+  <div id="root" data-composition-id="tenant" data-width="1920" data-height="1080"
+       data-composition-variables='[{"id":"tenantName","type":"string","label":"Tenant (illustrative)","default":"Bakmi Effata"}]'>
+    <div id="ten-prompt"><span class="who">Beelicious</span>Pilih tenant:<span class="opt">1. <span data-var-text="tenantName">Bakmi Effata</span></span></div>
+    <div id="ten-num" data-layout-bleed="true" data-layout-allow-overflow>1</div>
+    <h2 id="ten-answer"><span>Bakmi</span><br /><span>Effata</span></h2>
+    <div id="ten-cover"></div>
+  </div>
+  <script>
+    (function () {
+      const B = 30 / 60; // one beat: 120 BPM at 60 fps
+      const tl = gsap.timeline({ paused: true });
+      tl.set("#ten-cover", { y: 1080 }, 0);
+      // beat 1 — the bot asks
+      tl.fromTo("#ten-prompt", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.15, ease: "power4.out", immediateRender: false }, 0.03);
+      // beat 2 — the reply slams in
+      tl.fromTo("#ten-num", { opacity: 0, scale: 1.22, filter: "blur(14px)" }, { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.18, ease: "expo.out", immediateRender: false }, B);
+      tl.fromTo("#ten-answer span", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.15, ease: "power4.out", stagger: 0.067, immediateRender: false }, B + 0.12);
+      // bar end — parchment panel covers from below
+      tl.fromTo("#ten-cover", { y: 1080 }, { y: 0, duration: 0.28, ease: "power3.in", immediateRender: false }, 4 * B - 0.28);
+      window.__timelines = window.__timelines || {};
+      window.__timelines["tenant"] = tl;
+    })();
+  </script>
+</template>

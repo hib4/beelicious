@@ -1,0 +1,15 @@
+# HyperFrames tool state: previews, check caches, snapshots, locks and
+# video-state.json (which points at machine-local ~/.cache history blobs).
+.hyperframes/
+
+# Studio caches, regenerated on demand.
+.thumbnails/
+.waveform-cache/
+
+# media-use staging library. The sound effects the film uses are copied into
+# assets/sfx and their licences are recorded in CREDITS.md.
+.media/
+
+# Rendered videos. Re-render with `npm run render`; share the final MP4
+# outside git so each re-render doesn't add megabytes to history.
+renders/

@@ -1,0 +1,65 @@
+<template>
+  <style>
+    @font-face { font-family: "Plus Jakarta Sans"; src: url("assets/fonts/plus-jakarta-sans.woff2") format("woff2"); font-weight: 200 800; font-display: block; }
+    @font-face { font-family: "Inter"; src: url("assets/fonts/inter.woff2") format("woff2"); font-weight: 100 900; font-display: block; }
+    #root { position: absolute; inset: 0; overflow: hidden; background: #1D1B1B; }
+    #lun-swell { position: absolute; left: 96px; top: 700px; width: 832px; height: 140px; border-radius: 9999px; background: #FDC43D; opacity: 0; }
+    #lun-content { position: absolute; inset: 0; }
+    #lun-group { position: absolute; left: 96px; top: 300px; transform-origin: 0% 0%; }
+    #lun-label { display: block; font: 600 58px/1.2 "Inter"; color: #D7CABC; }
+    #lun-total { display: block; margin: 0 0 0 -14px; font: 800 375px/0.92 "Plus Jakarta Sans"; letter-spacing: -0.05em; color: #FDC43D; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    #lun-meta { position: absolute; left: 96px; top: 500px; font: 600 48px/1.35 "Inter"; color: #D7CABC; }
+    #lun-card { position: absolute; left: 1196px; top: 150px; width: 560px; height: 760px; border-radius: 20px; background: #FFFFFF; color: #1D1B1B; }
+    .lun-face { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+    .lun-face .h { font: 700 44px/1.2 "Inter"; letter-spacing: -0.01em; margin-bottom: 36px; }
+    .lun-face .f { font: 600 40px/1.2 "Inter"; font-variant-numeric: tabular-nums; margin-top: 36px; color: #494038; }
+    #lun-qr { width: 400px; height: 400px; }
+    #lun-ok-face { opacity: 0; }
+    #lun-ok-face .h { margin: 44px 40px 0; font-size: 50px; }
+    #lun-pill {
+      position: absolute; left: 96px; top: 700px; padding: 28px 56px 32px; border-radius: 9999px; white-space: nowrap;
+      background: #FDC43D; color: #1D1B1B; font: 800 84px/1 "Plus Jakarta Sans"; letter-spacing: -0.04em; word-spacing: 0.1em; opacity: 0;
+    }
+  </style>
+  <div id="root" data-composition-id="lunas" data-width="1920" data-height="1080">
+    <div id="lun-swell"></div>
+    <div id="lun-content">
+      <div id="lun-group">
+        <span id="lun-label">Total</span>
+        <div id="lun-total">Rp60.000</div>
+      </div>
+      <div id="lun-meta">Bakmi Effata<br />Pickup 12.15 WIB</div>
+      <div id="lun-card">
+        <div id="lun-qr-face" class="lun-face"><span class="h">Pembayaran QRIS</span><div id="lun-qr"><svg viewBox="0 0 25 25" width="400" height="400" shape-rendering="crispEdges"><path fill="#1D1B1B" d="M0 0h1v1h-1zM1 0h1v1h-1zM2 0h1v1h-1zM3 0h1v1h-1zM4 0h1v1h-1zM5 0h1v1h-1zM6 0h1v1h-1zM8 0h1v1h-1zM10 0h1v1h-1zM11 0h1v1h-1zM13 0h1v1h-1zM15 0h1v1h-1zM16 0h1v1h-1zM18 0h1v1h-1zM19 0h1v1h-1zM20 0h1v1h-1zM21 0h1v1h-1zM22 0h1v1h-1zM23 0h1v1h-1zM24 0h1v1h-1zM0 1h1v1h-1zM6 1h1v1h-1zM8 1h1v1h-1zM10 1h1v1h-1zM12 1h1v1h-1zM15 1h1v1h-1zM18 1h1v1h-1zM24 1h1v1h-1zM0 2h1v1h-1zM2 2h1v1h-1zM3 2h1v1h-1zM4 2h1v1h-1zM6 2h1v1h-1zM8 2h1v1h-1zM18 2h1v1h-1zM20 2h1v1h-1zM21 2h1v1h-1zM22 2h1v1h-1zM24 2h1v1h-1zM0 3h1v1h-1zM2 3h1v1h-1zM3 3h1v1h-1zM4 3h1v1h-1zM6 3h1v1h-1zM10 3h1v1h-1zM12 3h1v1h-1zM14 3h1v1h-1zM18 3h1v1h-1zM20 3h1v1h-1zM21 3h1v1h-1zM22 3h1v1h-1zM24 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM3 4h1v1h-1zM4 4h1v1h-1zM6 4h1v1h-1zM11 4h1v1h-1zM12 4h1v1h-1zM18 4h1v1h-1zM20 4h1v1h-1zM21 4h1v1h-1zM22 4h1v1h-1zM24 4h1v1h-1zM0 5h1v1h-1zM6 5h1v1h-1zM12 5h1v1h-1zM13 5h1v1h-1zM14 5h1v1h-1zM16 5h1v1h-1zM18 5h1v1h-1zM24 5h1v1h-1zM0 6h1v1h-1zM1 6h1v1h-1zM2 6h1v1h-1zM3 6h1v1h-1zM4 6h1v1h-1zM5 6h1v1h-1zM6 6h1v1h-1zM9 6h1v1h-1zM10 6h1v1h-1zM13 6h1v1h-1zM14 6h1v1h-1zM15 6h1v1h-1zM18 6h1v1h-1zM19 6h1v1h-1zM20 6h1v1h-1zM21 6h1v1h-1zM22 6h1v1h-1zM23 6h1v1h-1zM24 6h1v1h-1zM8 7h1v1h-1zM9 7h1v1h-1zM11 7h1v1h-1zM12 7h1v1h-1zM13 7h1v1h-1zM15 7h1v1h-1zM0 8h1v1h-1zM3 8h1v1h-1zM4 8h1v1h-1zM5 8h1v1h-1zM6 8h1v1h-1zM7 8h1v1h-1zM10 8h1v1h-1zM12 8h1v1h-1zM14 8h1v1h-1zM17 8h1v1h-1zM18 8h1v1h-1zM20 8h1v1h-1zM21 8h1v1h-1zM23 8h1v1h-1zM24 8h1v1h-1zM1 9h1v1h-1zM2 9h1v1h-1zM4 9h1v1h-1zM5 9h1v1h-1zM9 9h1v1h-1zM10 9h1v1h-1zM12 9h1v1h-1zM13 9h1v1h-1zM15 9h1v1h-1zM16 9h1v1h-1zM17 9h1v1h-1zM18 9h1v1h-1zM20 9h1v1h-1zM23 9h1v1h-1zM0 10h1v1h-1zM3 10h1v1h-1zM4 10h1v1h-1zM13 10h1v1h-1zM18 10h1v1h-1zM19 10h1v1h-1zM20 10h1v1h-1zM22 10h1v1h-1zM0 11h1v1h-1zM1 11h1v1h-1zM2 11h1v1h-1zM3 11h1v1h-1zM4 11h1v1h-1zM6 11h1v1h-1zM10 11h1v1h-1zM11 11h1v1h-1zM21 11h1v1h-1zM22 11h1v1h-1zM23 11h1v1h-1zM24 11h1v1h-1zM3 12h1v1h-1zM4 12h1v1h-1zM5 12h1v1h-1zM8 12h1v1h-1zM9 12h1v1h-1zM10 12h1v1h-1zM11 12h1v1h-1zM16 12h1v1h-1zM18 12h1v1h-1zM19 12h1v1h-1zM23 12h1v1h-1zM24 12h1v1h-1zM0 13h1v1h-1zM1 13h1v1h-1zM2 13h1v1h-1zM5 13h1v1h-1zM7 13h1v1h-1zM8 13h1v1h-1zM9 13h1v1h-1zM14 13h1v1h-1zM15 13h1v1h-1zM18 13h1v1h-1zM20 13h1v1h-1zM21 13h1v1h-1zM22 13h1v1h-1zM23 13h1v1h-1zM1 14h1v1h-1zM3 14h1v1h-1zM8 14h1v1h-1zM11 14h1v1h-1zM12 14h1v1h-1zM13 14h1v1h-1zM18 14h1v1h-1zM19 14h1v1h-1zM20 14h1v1h-1zM22 14h1v1h-1zM24 14h1v1h-1zM0 15h1v1h-1zM1 15h1v1h-1zM2 15h1v1h-1zM4 15h1v1h-1zM5 15h1v1h-1zM7 15h1v1h-1zM8 15h1v1h-1zM13 15h1v1h-1zM14 15h1v1h-1zM15 15h1v1h-1zM16 15h1v1h-1zM19 15h1v1h-1zM20 15h1v1h-1zM21 15h1v1h-1zM22 15h1v1h-1zM23 15h1v1h-1zM24 15h1v1h-1zM0 16h1v1h-1zM5 16h1v1h-1zM7 16h1v1h-1zM8 16h1v1h-1zM9 16h1v1h-1zM10 16h1v1h-1zM11 16h1v1h-1zM13 16h1v1h-1zM16 16h1v1h-1zM17 16h1v1h-1zM18 16h1v1h-1zM19 16h1v1h-1zM20 16h1v1h-1zM23 16h1v1h-1zM8 17h1v1h-1zM10 17h1v1h-1zM12 17h1v1h-1zM16 17h1v1h-1zM20 17h1v1h-1zM23 17h1v1h-1zM0 18h1v1h-1zM1 18h1v1h-1zM2 18h1v1h-1zM3 18h1v1h-1zM4 18h1v1h-1zM5 18h1v1h-1zM6 18h1v1h-1zM8 18h1v1h-1zM9 18h1v1h-1zM11 18h1v1h-1zM12 18h1v1h-1zM13 18h1v1h-1zM16 18h1v1h-1zM18 18h1v1h-1zM20 18h1v1h-1zM23 18h1v1h-1zM24 18h1v1h-1zM0 19h1v1h-1zM6 19h1v1h-1zM9 19h1v1h-1zM16 19h1v1h-1zM20 19h1v1h-1zM21 19h1v1h-1zM22 19h1v1h-1zM23 19h1v1h-1zM24 19h1v1h-1zM0 20h1v1h-1zM2 20h1v1h-1zM3 20h1v1h-1zM4 20h1v1h-1zM6 20h1v1h-1zM12 20h1v1h-1zM13 20h1v1h-1zM16 20h1v1h-1zM17 20h1v1h-1zM18 20h1v1h-1zM19 20h1v1h-1zM20 20h1v1h-1zM22 20h1v1h-1zM23 20h1v1h-1zM0 21h1v1h-1zM2 21h1v1h-1zM3 21h1v1h-1zM4 21h1v1h-1zM6 21h1v1h-1zM8 21h1v1h-1zM11 21h1v1h-1zM13 21h1v1h-1zM14 21h1v1h-1zM19 21h1v1h-1zM21 21h1v1h-1zM22 21h1v1h-1zM23 21h1v1h-1zM24 21h1v1h-1zM0 22h1v1h-1zM2 22h1v1h-1zM3 22h1v1h-1zM4 22h1v1h-1zM6 22h1v1h-1zM8 22h1v1h-1zM9 22h1v1h-1zM10 22h1v1h-1zM11 22h1v1h-1zM14 22h1v1h-1zM15 22h1v1h-1zM16 22h1v1h-1zM17 22h1v1h-1zM20 22h1v1h-1zM21 22h1v1h-1zM23 22h1v1h-1zM0 23h1v1h-1zM6 23h1v1h-1zM8 23h1v1h-1zM14 23h1v1h-1zM15 23h1v1h-1zM19 23h1v1h-1zM21 23h1v1h-1zM22 23h1v1h-1zM23 23h1v1h-1zM0 24h1v1h-1zM1 24h1v1h-1zM2 24h1v1h-1zM3 24h1v1h-1zM4 24h1v1h-1zM5 24h1v1h-1zM6 24h1v1h-1zM8 24h1v1h-1zM9 24h1v1h-1zM10 24h1v1h-1zM15 24h1v1h-1zM17 24h1v1h-1zM21 24h1v1h-1zM22 24h1v1h-1zM24 24h1v1h-1z"/></svg></div><span class="f">Total Rp60.000</span></div>
+        <div id="lun-ok-face" class="lun-face">
+          <svg width="240" height="240" viewBox="0 0 240 240"><circle cx="120" cy="120" r="120" fill="#166B45"/><path id="lun-tick" d="M66 124 L104 160 L176 84" fill="none" stroke="#FFFFFF" stroke-width="22" stroke-linecap="round" stroke-linejoin="round" pathLength="100" stroke-dasharray="100 120" stroke-dashoffset="110"/></svg>
+          <span class="h">Pembayaran terverifikasi</span>
+        </div>
+      </div>
+      <div id="lun-pill">Siap diambil · 12.15</div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const B = 30 / 60; // one beat: 120 BPM at 60 fps
+      const tl = gsap.timeline({ paused: true });
+      // first frame = last frame of "bayar"
+      tl.set("#lun-group", { scale: 0.5, y: -130 }, 0);
+      // the QRIS card flips to the verified side
+      tl.fromTo("#lun-card", { scaleX: 1 }, { scaleX: 0, duration: 0.12, ease: "power2.in", immediateRender: false }, 0.02);
+      tl.set("#lun-qr-face", { opacity: 0 }, 0.14);
+      tl.set("#lun-ok-face", { opacity: 1 }, 0.14);
+      tl.fromTo("#lun-card", { scaleX: 0 }, { scaleX: 1, duration: 0.16, ease: "power2.out", immediateRender: false }, 0.14);
+      tl.fromTo("#lun-tick", { strokeDashoffset: 110 }, { strokeDashoffset: 0, duration: 0.25, ease: "power2.out", immediateRender: false }, 0.24);
+      // beat 2 — ready for pickup
+      tl.fromTo("#lun-pill", { opacity: 0, scale: 0.6, transformOrigin: "0% 50%" }, { opacity: 1, scale: 1, duration: 0.28, ease: "back.out(1.7)", immediateRender: false }, B);
+      // bar end — the "ready" pill swells into the next yellow world
+      const f = 4 * B - 0.4;
+      tl.set("#lun-swell", { opacity: 1, scaleX: 1, scaleY: 1 }, f);
+      tl.fromTo("#lun-content", { filter: "blur(0px)" }, { opacity: 0, filter: "blur(12px)", duration: 0.16, ease: "power3.in", immediateRender: false }, f + 0.06);
+      tl.fromTo("#lun-swell", { scaleX: 1, scaleY: 1 }, { scaleX: 3.7, scaleY: 11.8, duration: 0.4, ease: "power2.in", immediateRender: false }, f);
+      window.__timelines = window.__timelines || {};
+      window.__timelines["lunas"] = tl;
+    })();
+  </script>
+</template>
