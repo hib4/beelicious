@@ -1,4 +1,3 @@
-
 import { dashboardConfig } from '@/lib/dashboard/config';
 import { authClient } from '@/lib/dashboard/auth';
 
@@ -31,8 +30,7 @@ async function forward(
   // Validasi origin untuk request yang mengubah data
   if (
     request.method !== 'GET' &&
-    request.headers.get('origin') !==
-      new URL(configuration.siteUrl).origin
+    request.headers.get('origin') !== new URL(configuration.siteUrl).origin
   ) {
     return Response.json(
       { error: { message: 'Permintaan tidak diizinkan.' } },
@@ -40,40 +38,27 @@ async function forward(
     );
   }
 
-  let accessToken: string | null = null;
+  const client = await authClient();
 
-  // DEVELOPMENT BYPASS
-  if (!configuration.bypass) {
-    const client = await authClient();
+  const { data } = client
+    ? await client.auth.getSession()
+    : { data: { session: null } };
 
-    const { data } = client
-      ? await client.auth.getSession()
-      : { data: { session: null } };
-
-    if (!data.session) {
-      return Response.json(
-        { error: { message: 'Silakan masuk kembali.' } },
-        { status: 401 },
-      );
-    }
-
-    accessToken = data.session.access_token;
+  if (!data.session) {
+    return Response.json(
+      { error: { message: 'Silakan masuk kembali.' } },
+      { status: 401 },
+    );
   }
 
   const base = configuration.apiUrl;
 
   try {
-    const target = new URL(
-      `/api/v1/tenant-dashboard/${path}`,
-      base,
-    );
+    const target = new URL(`/api/v1/tenant-dashboard/${path}`, base);
 
     target.search = new URL(request.url).search;
 
-    const body =
-      request.method === 'GET'
-        ? undefined
-        : await request.text();
+    const body = request.method === 'GET' ? undefined : await request.text();
 
     if (body && body.length > 65536) {
       return Response.json(
@@ -83,14 +68,10 @@ async function forward(
     }
 
     const headers: Record<string, string> = {
+      authorization: `Bearer ${data.session.access_token}`,
       'x-tenant-id': request.headers.get('x-tenant-id') ?? '',
       'content-type': 'application/json',
     };
-
-    // Token hanya dikirim jika menggunakan autentikasi normal
-    if (accessToken) {
-      headers.authorization = `Bearer ${accessToken}`;
-    }
 
     const response = await fetch(target, {
       method: request.method,
