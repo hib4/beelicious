@@ -11,3 +11,5 @@ Desktop uses a 240px sidebar. At tablet widths navigation folds above content; m
 Lists expose filters, pagination and manual refresh. Polling pauses in hidden tabs. Mutations report committed outcomes separately from WhatsApp delivery. Stale/conflicting edits require refresh. Empty/error/loading states retain the surrounding frame.
 
 Browser validation covers 320, 390, 768 and 1440px with mocked authentication and real suite-owned PostgreSQL data. Capture screenshots and inspect them; automated accessibility is not a screen-reader certification.
+
+Dropdowns use the shared Beelicious `Select` (`select.tsx`, ARIA select-only combobox with keyboard support and a hidden input for forms), never native `<select>` styling. Order status filters are pressed-button tabs that also set the queue scope; below a 640px content width they collapse into the same `Select`. Layouts respond to the content container (container queries in `dashboard.css`), so tables become labelled stacked cards instead of clipping or scrolling sideways. `dashboard.css` is a single consolidated sheet: add rules to the matching section rather than appending override blocks.

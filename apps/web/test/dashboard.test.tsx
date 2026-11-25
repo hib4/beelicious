@@ -46,7 +46,13 @@ it('uses historical item snapshots and separate payment/fulfillment labels', () 
     ],
   } as DashboardOrder;
   render(<OrderRows orders={[order]} />);
-  expect(screen.getByText('2× Historical rice')).toBeVisible();
+  expect(
+    screen.getByText(
+      (_, element) =>
+        element?.tagName === 'LI' &&
+        element.textContent === '2× Historical rice',
+    ),
+  ).toBeVisible();
   expect(screen.getByText('Lunas')).toBeVisible();
   expect(screen.getByText('Disiapkan')).toBeVisible();
   expect(screen.getByRole('link', { name: 'BEE-TEST' })).toHaveAttribute(
@@ -86,7 +92,7 @@ it('paginates bounded lists and gives statuses readable labels', () => {
   expect(money(20000)).toContain('20.000');
 });
 
-it('labels payment sources honestly and offers acceptance for new orders', () => {
+it('labels payment sources honestly and offers no fulfillment action before payment', () => {
   expect(paymentSourceLabel(null)).toBe('Belum ada pembayaran');
   expect(paymentSourceLabel({ provider: 'midtrans' })).toBe('Midtrans Sandbox');
   const order = {
@@ -102,8 +108,11 @@ it('labels payment sources honestly and offers acceptance for new orders', () =>
     items: [],
   } as unknown as DashboardOrder;
   render(<OrderRows orders={[order]} />);
-  expect(screen.getByRole('link', { name: 'Terima pesanan' })).toBeVisible();
+  expect(
+    screen.getByRole('link', { name: 'Lihat detail BEE-NEW' }),
+  ).toBeVisible();
   expect(screen.getByText('Belum ada pembayaran')).toBeVisible();
+  expect(screen.queryByRole('link', { name: /^Terima pesanan/ })).toBeNull();
   expect(screen.queryByText('Midtrans Sandbox')).toBeNull();
 });
 
@@ -157,4 +166,28 @@ it('greets the signed-in tenant with real data and hides an empty queue banner',
   expect(screen.queryByText('SANDBOX')).toBeNull();
   vi.unstubAllGlobals();
   vi.useRealTimers();
+});
+
+it('renders order rows with labelled cells for the stacked mobile layout', () => {
+  const order = {
+    id: 'label-order',
+    orderNumber: 'BEE-LABEL',
+    tenantName: 'Bakmi Effata',
+    status: 'CONFIRMED',
+    placedAt: '2026-10-21T02:00:00Z',
+    pickupSlot: { startsAt: '2026-10-21T04:00:00Z' },
+    payment: { status: 'SUCCEEDED', provider: 'mock' },
+    fulfillmentStatus: 'ACCEPTED',
+    customer: { displayName: null },
+    totalAmount: 20000,
+    items: [],
+  } as unknown as DashboardOrder;
+  const { container } = render(<OrderRows orders={[order]} />);
+  const labels = [...container.querySelectorAll('td[data-label]')].map((cell) =>
+    cell.getAttribute('data-label'),
+  );
+  expect(labels).toEqual(['Pesanan', 'Menu', 'Pickup', 'Status', 'Total']);
+  expect(
+    screen.getByRole('link', { name: 'Mulai siapkan BEE-LABEL' }),
+  ).toBeVisible();
 });

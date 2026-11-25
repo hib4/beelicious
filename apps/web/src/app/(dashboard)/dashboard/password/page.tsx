@@ -1,4 +1,5 @@
 import { updatePassword } from '@/lib/dashboard/actions';
+import { PageHeading } from '@/components/dashboard/workspace';
 export default async function Password({
   searchParams,
 }: {
@@ -6,9 +7,12 @@ export default async function Password({
 }) {
   const { error } = await searchParams;
   return (
-    <section>
-      <h1>Ganti kata sandi</h1>
-      <form action={updatePassword} className="dash-form">
+    <div className="dash-page dash-password">
+      <PageHeading
+        title="Ganti kata sandi"
+        description="Gunakan minimal 12 karakter. Kata sandi dikelola oleh layanan autentikasi, bukan disimpan oleh Beelicious."
+      />
+      <form action={updatePassword} className="dash-card dash-panel dash-form">
         <label>
           Kata sandi baru
           <input
@@ -21,10 +25,14 @@ export default async function Password({
           />
         </label>
         {error && (
-          <p role="alert">Gunakan minimal 12 karakter. Coba kembali.</p>
+          <p role="alert" className="dash-error">
+            Gunakan minimal 12 karakter. Coba kembali.
+          </p>
         )}
-        <button className="dash-primary">Simpan kata sandi</button>
+        <div className="dash-form-actions">
+          <button className="dash-button is-primary">Simpan kata sandi</button>
+        </div>
       </form>
-    </section>
+    </div>
   );
 }

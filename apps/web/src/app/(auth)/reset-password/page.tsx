@@ -23,7 +23,9 @@ export default async function Reset({
               Email
               <input name="email" type="email" required autoComplete="email" />
             </label>
-            <button className="dash-primary">Kirim tautan pemulihan</button>
+            <button className="dash-button is-primary is-block">
+              Kirim tautan pemulihan
+            </button>
           </form>
         )}
       </section>

@@ -98,7 +98,11 @@ test('menu edits and availability persist; tenant switching clears workspace dat
   await page
     .locator('.dash-sidebar')
     .getByRole('combobox', { name: 'Tenant', exact: true })
-    .selectOption({ label: 'Tenant Kedua' });
+    .click();
+  await page
+    .locator('.dash-sidebar')
+    .getByRole('option', { name: 'Tenant Kedua', exact: true })
+    .click();
   await expect(
     page.getByRole('heading', { name: 'Ringkasan', exact: true }),
   ).toBeVisible();
@@ -141,9 +145,19 @@ for (const width of [320, 390, 768, 1440])
         page.getByRole('button', { name: 'Buka navigasi' }),
       ).toHaveAttribute('aria-expanded', 'false');
     } else await page.goto('/dashboard/orders');
-    await page
-      .getByRole('combobox', { name: 'Antrean', exact: true })
-      .selectOption('all');
+    const allTab = page.getByRole('button', {
+      name: 'Semua pesanan',
+      exact: true,
+    });
+    if (await allTab.isVisible()) await allTab.click();
+    else {
+      await page
+        .getByRole('combobox', { name: 'Status pesanan', exact: true })
+        .click();
+      await page
+        .getByRole('option', { name: 'Semua pesanan', exact: true })
+        .click();
+    }
     await expect(page.locator('.dash-order-link')).toHaveCount(1);
     expect(
       await page.evaluate(
@@ -163,9 +177,9 @@ test('pickup data, blocked closure feedback, and logout work', async ({
   await login(page);
   await page.goto('/dashboard/pickup');
   await expect(
-    page.getByRole('heading', { name: 'Jam operasional', exact: true }),
+    page.getByRole('tab', { name: 'Jam operasional', exact: true }),
   ).toBeVisible();
-  await expect(page.locator('.dash-slot-row').first()).toBeVisible();
+  await expect(page.locator('.dash-pickup-slot').first()).toBeVisible();
   await page.screenshot({
     path: '/tmp/beelicious-dashboard-pickup.png',
     fullPage: false,

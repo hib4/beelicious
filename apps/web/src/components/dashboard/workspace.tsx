@@ -11,6 +11,7 @@ import {
 import {
   QueryClient,
   QueryClientProvider,
+  keepPreviousData,
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
@@ -26,10 +27,15 @@ import {
   Settings,
   Menu,
   X,
+  RefreshCw,
+  ChevronLeft,
+  LogOut,
+  KeyRound,
 } from 'lucide-react';
 
 import type { Membership } from '@beelicious/shared';
 import { logout } from '@/lib/dashboard/actions';
+import { Select } from './select';
 
 // ============================================
 // API ERROR
@@ -108,6 +114,7 @@ export function useDashboardQuery<T>(
   path: string,
   poll = false,
   enabled = true,
+  keepPrevious = false,
 ) {
   const { tenant } = useWorkspace();
 
@@ -117,6 +124,9 @@ export function useDashboardQuery<T>(
     queryFn: ({ signal }) => dashboardApi<T>(path, tenant, { signal }),
 
     enabled,
+
+    // Lists keep showing the last result while a new filter loads.
+    ...(keepPrevious ? { placeholderData: keepPreviousData } : {}),
 
     ...(poll
       ? {
@@ -280,7 +290,11 @@ function Shell({
             aria-controls="dash-sidebar"
             onClick={() => setOpen(!open)}
           >
-            {open ? <X size={20} /> : <Menu size={20} />}
+            {open ? (
+              <X size={20} aria-hidden="true" />
+            ) : (
+              <Menu size={20} aria-hidden="true" />
+            )}
           </button>
         </header>
 
@@ -296,42 +310,33 @@ function Shell({
 
           {/* TENANT SELECTOR */}
 
-          {memberships && memberships.length > 1 ? (
-            <label>
-              Tenant
-              <select
+          <div className="dash-tenant-block">
+            {memberships && memberships.length > 1 ? (
+              <Select
+                label="Tenant"
                 value={member.tenantId}
-                onChange={(e) => {
+                options={memberships.map((m) => ({
+                  value: m.tenantId,
+                  label: m.tenant.name,
+                }))}
+                onChange={(tenantId) => {
                   void client.cancelQueries();
-
-                  client.removeQueries({
-                    queryKey: ['dashboard'],
-                  });
-
-                  setSelected(e.target.value);
+                  client.removeQueries({ queryKey: ['dashboard'] });
+                  setSelected(tenantId);
                   setOpen(false);
-
                   router.push('/dashboard');
                 }}
-              >
-                {memberships.map((m) => (
-                  <option key={m.tenantId} value={m.tenantId}>
-                    {m.tenant.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : (
-            <p className="dash-tenant">{member.tenant.name}</p>
-          )}
+              />
+            ) : (
+              <p className="dash-tenant">{member.tenant.name}</p>
+            )}
 
-          {/* TENANT ROLE */}
-
-          <p className="dash-muted dash-role-badge">
-            {member.role === 'OWNER' ? 'Pemilik' : 'Staf'}
-
-            {!member.tenant.isActive ? ' · Tenant nonaktif' : ''}
-          </p>
+            {/* TENANT ROLE */}
+            <p className="dash-role-badge">
+              {member.role === 'OWNER' ? 'Pemilik' : 'Staf'}
+              {!member.tenant.isActive ? ' · Tenant nonaktif' : ''}
+            </p>
+          </div>
 
           {/* NAVIGATION */}
 
@@ -347,7 +352,7 @@ function Shell({
                 }
                 onClick={() => setOpen(false)}
               >
-                <Icon size={18} />
+                <Icon size={18} aria-hidden="true" />
                 {label}
               </Link>
             ))}
@@ -356,17 +361,33 @@ function Shell({
           {/* ACCOUNT */}
 
           <div className="dash-account">
-            <span>{account}</span>
+            <span className="dash-account-email" title={account}>
+              {account}
+            </span>
 
-            <Link href="/dashboard/password">Ganti kata sandi</Link>
+            <Link href="/dashboard/password" onClick={() => setOpen(false)}>
+              <KeyRound size={16} aria-hidden="true" />
+              Ganti kata sandi
+            </Link>
 
             <form action={logout} onSubmit={() => client.clear()}>
-              <button>Keluar</button>
+              <button>
+                <LogOut size={16} aria-hidden="true" />
+                Keluar
+              </button>
             </form>
           </div>
         </aside>
 
         {/* MAIN CONTENT */}
+
+        {open && (
+          <div
+            className="dash-scrim"
+            aria-hidden="true"
+            onClick={() => setOpen(false)}
+          />
+        )}
 
         <main id="main" className="dash-content" key={member.tenantId}>
           {children}
@@ -420,19 +441,44 @@ export function PageHeading({
   title,
   description,
   refresh,
+  back,
+  actions,
 }: {
   title: string;
-  description: string;
+  description?: ReactNode;
   refresh?: () => void;
+  back?: { href: string; label: string };
+  actions?: ReactNode;
 }) {
   return (
     <header className="dash-heading">
-      <div>
+      <div className="dash-heading-text">
+        {back && (
+          <Link className="dash-back" href={back.href}>
+            <ChevronLeft size={16} aria-hidden="true" />
+            {back.label}
+          </Link>
+        )}
         <h1>{title}</h1>
-        <p>{description}</p>
+        {description && <p>{description}</p>}
       </div>
 
-      {refresh && <button onClick={refresh}>Muat ulang</button>}
+      {(refresh || actions) && (
+        <div className="dash-heading-actions">
+          {refresh && (
+            <button
+              type="button"
+              className="dash-icon-button"
+              aria-label="Muat ulang"
+              title="Muat ulang"
+              onClick={refresh}
+            >
+              <RefreshCw size={18} aria-hidden="true" />
+            </button>
+          )}
+          {actions}
+        </div>
+      )}
     </header>
   );
 }
@@ -455,7 +501,8 @@ export function Pagination({
   return (
     <div className="dash-pagination">
       <span>
-        {total} hasil · Halaman {page}
+        {total} hasil · Halaman {page} dari{' '}
+        {Math.max(1, Math.ceil(total / size))}
       </span>
 
       <button disabled={page <= 1} onClick={() => onPage(page - 1)}>
@@ -572,7 +619,7 @@ export function Status({ value }: { value: string | null }) {
 
   return (
     <span
-      className={`dash-status ${value ? (statusClasses[value] ?? '') : ''}`}
+      className={`dash-status ${value ? (statusClasses[value] ?? '') : 'is-muted'}`}
     >
       {value ? (stageLabels[value] ?? value) : 'Belum tersedia'}
     </span>

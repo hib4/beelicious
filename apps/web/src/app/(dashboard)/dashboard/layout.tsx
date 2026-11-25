@@ -18,17 +18,13 @@ export default async function Layout({
   // Normal Supabase authentication
   const client = await authClient();
 
-  const user = client
-    ? (await client.auth.getUser()).data.user
-    : null;
+  const user = client ? (await client.auth.getUser()).data.user : null;
 
   // Redirect jika pengguna belum login
   if (!user) redirect('/login');
 
   return (
-    <WorkspaceProvider
-      account={user.email ?? 'Akun tenant'}
-    >
+    <WorkspaceProvider account={user.email ?? 'Akun tenant'}>
       {children}
     </WorkspaceProvider>
   );

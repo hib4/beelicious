@@ -49,7 +49,7 @@ export default async function Login({
                 kembali.
               </p>
             )}
-            <button className="dash-primary">Masuk</button>
+            <button className="dash-button is-primary is-block">Masuk</button>
             <Link href="/reset-password">Lupa kata sandi?</Link>
           </form>
         ) : (
