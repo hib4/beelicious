@@ -9,16 +9,12 @@ export function MerchantSpotlight({ merchant }: { merchant: MerchantContent }) {
       <div className="merchant-story">
         <p className="merchant-status">{merchant.label}</p>
         <p>{merchant.description}</p>
-        <p>
-          Katalog pilot berisi contoh pengembangan. Informasi layanan publik dan
-          foto asli tenant belum tersedia.
-        </p>
         {merchant.availability && <p>{merchant.availability}</p>}
         {merchant.orderingAvailable ? (
           <WhatsAppCta />
         ) : (
           <a className="editorial-link" href="#cara-kerja">
-            Lihat alur pilot
+            Lihat cara kerja
             <ArrowUpRight size={20} aria-hidden="true" />
           </a>
         )}

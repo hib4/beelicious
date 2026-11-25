@@ -16,10 +16,11 @@ describe('landing page', () => {
     for (const id of ['cara-kerja', 'tenant', 'pengalaman', 'tentang'])
       expect(document.getElementById(id)).toBeInTheDocument();
     expect(screen.getAllByText('Bakmi Effata').length).toBeGreaterThan(0);
-    expect(screen.getByText('Contoh tenant pilot')).toBeInTheDocument();
+    expect(screen.getByText('Tenant Beelicious')).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/pilot/i);
     expect(
-      screen.getByText(/foto asli tenant belum tersedia/),
-    ).toBeInTheDocument();
+      screen.getAllByRole('link', { name: 'Pesan via WhatsApp' })[0],
+    ).toHaveAttribute('href', 'https://wa.me/628194031422?text=Halo');
     expect(
       screen.getByRole('navigation', { name: 'Bagian contoh percakapan' }),
     ).toBeInTheDocument();
@@ -40,7 +41,7 @@ describe('landing page', () => {
       ).not.toBeNull();
   });
   it('does not create a broken ordering link', () => {
-    render(<WhatsAppCta />);
+    render(<WhatsAppCta href="" />);
     expect(screen.getByRole('button', { name: 'Segera Hadir' })).toBeDisabled();
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });

@@ -8,7 +8,7 @@ web
 
 ## Users and purpose
 
-Indonesian food customers discover tenants and order through a guided WhatsApp conversation. The marketing website explains the platform and invites approved pilot users to open WhatsApp. Beelicious is not a restaurant, kitchen, or delivery operator.
+Indonesian food customers discover tenants and order through a guided WhatsApp conversation. The marketing website explains the platform and invites customers to open WhatsApp. Beelicious is not a restaurant, kitchen, or delivery operator.
 
 ## Stack
 
@@ -24,7 +24,7 @@ Use DESIGN.md, the supplied beelicious.png unchanged, Indonesian copy, accessibl
 
 ## Evidence on hand
 
-Bakmi Effata is the supplied pilot example. Menu entries and operating hours are development fixtures, not verified commercial information. No authentic merchant photography, finalized wordmark, public contact, or production site origin has been supplied.
+Bakmi Effata is the featured tenant. Menu entries and operating hours are development fixtures, not verified commercial information. No authentic merchant photography, finalized wordmark, public contact, or production site origin has been supplied.
 
 ## Product principles
 

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { resolvePublicConfig } from '../src/lib/public-config';
+import {
+  PRODUCTION_WHATSAPP_NUMBER,
+  publicConfig,
+  resolvePublicConfig,
+} from '../src/lib/public-config';
 describe('public WhatsApp configuration', () => {
   it('normalizes international format and starts the recognized greeting', () => {
     expect(
@@ -30,6 +34,16 @@ describe('public WhatsApp configuration', () => {
       ).toBe(false);
     },
   );
+  it('defaults to the production ordering number', () => {
+    expect(PRODUCTION_WHATSAPP_NUMBER).toBe('628194031422');
+    if (
+      !process.env.NEXT_PUBLIC_WHATSAPP_NUMBER &&
+      !process.env.NEXT_PUBLIC_ORDERING_ENABLED
+    )
+      expect(publicConfig.whatsappUrl).toBe(
+        'https://wa.me/628194031422?text=Halo',
+      );
+  });
   it('disables missing configuration', () => {
     expect(resolvePublicConfig({}).whatsappUrl).toBeUndefined();
   });

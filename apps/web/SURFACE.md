@@ -2,7 +2,7 @@
 
 ## Confirmed direction
 
-Big Type. Bold Food. Playful Bee. A bold editorial poster system with the original Bee-bot, existing brand palette/Plus Jakarta Sans/Inter, licensed editorial food photographs, and an immersive numeric WhatsApp journey. Audience remains invited pilot users; ordering defaults to Segera Hadir. No production collection or public launch is claimed.
+Big Type. Bold Food. Playful Bee. A bold editorial poster system with the original Bee-bot, existing brand palette/Plus Jakarta Sans/Inter, licensed editorial food photographs, and an immersive numeric WhatsApp journey. The page is the public production landing; ordering defaults to the built-in WhatsApp number, and the page carries no pilot wording.
 
 ## Argument and composition
 
@@ -10,7 +10,7 @@ Big Type. Bold Food. Playful Bee. A bold editorial poster system with the origin
 - The mechanism is simple: a short CHAT. PILIH. PICK UP. transition, tied to native scrolling.
 - Food is the subject: one dominant nasi goreng photograph and two supporting food/drink crops, explicitly editorial.
 - The product proves its promise: six chapters demonstrate greeting, tenant, menu/quantity, cart, pickup, and gateway instructions with realistic numeric messages.
-- The pilot is concrete: Bakmi Effata is a large typography-led spotlight, with no invented merchant photo or availability.
+- The tenant is concrete: Bakmi Effata is a large typography-led spotlight, with no invented merchant photo or availability.
 - The platform is distinct from its tenants: a short Bukan restoran. manifesto.
 - The story closes with the original mascot and one WhatsApp action, followed by a large Beelicious wordmark and real links/credits.
 

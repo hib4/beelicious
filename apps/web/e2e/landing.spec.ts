@@ -44,7 +44,7 @@ for (const width of [320, 375, 390, 768, 1280, 1440]) {
     );
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
       'content',
-      /noindex/,
+      /^index, follow$/,
     );
     await expect(page.locator('meta[property="og:title"]')).toHaveAttribute(
       'content',
@@ -89,9 +89,12 @@ test('ordering configuration and local assets remain safe', async ({
       failures.push(new URL(response.url()).pathname);
   });
   await page.goto('/');
+  // Mirrors publicConfig: ordering and the production number are defaults.
   const enabled =
-    process.env.NEXT_PUBLIC_ORDERING_ENABLED === 'true' &&
-    /^\+?[1-9]\d{7,14}$/.test(process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? '');
+    (process.env.NEXT_PUBLIC_ORDERING_ENABLED || 'true') === 'true' &&
+    /^\+?[1-9]\d{7,14}$/.test(
+      process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '628194031422',
+    );
   if (enabled) {
     const links = page.getByRole('link', { name: 'Pesan via WhatsApp' });
     await expect(links.first()).toHaveAttribute(
@@ -115,9 +118,10 @@ test('ordering configuration and local assets remain safe', async ({
     '/sitemap.xml',
   ])
     expect((await request.get(path)).ok()).toBe(true);
-  expect(await (await request.get('/robots.txt')).text()).toContain(
-    'Disallow: /',
-  );
+  const robots = await (await request.get('/robots.txt')).text();
+  expect(robots).toContain('Allow: /');
+  expect(robots).toContain('Disallow: /dashboard');
+  expect(robots).not.toMatch(/^Disallow: \/$/m);
   expect(failures).toEqual([]);
 });
 test('live chat reveals a customer, typing indicator, then reply without page scrolling', async ({

@@ -15,9 +15,9 @@ export interface MerchantContent {
 export const merchants: readonly MerchantContent[] = [
   {
     name: 'Bakmi Effata',
-    description: 'Tenant bakmi untuk pilot Beelicious.',
-    label: 'Contoh tenant pilot',
+    description: 'Tenant bakmi di Beelicious.',
+    label: 'Tenant Beelicious',
     image: null,
-    orderingAvailable: false,
+    orderingAvailable: true,
   },
 ] as const;

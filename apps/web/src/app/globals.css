@@ -259,12 +259,6 @@ svg {
 .hero-action {
   margin-top: 28px;
 }
-.pilot-note {
-  font-size: 14px;
-  line-height: 1.5;
-  margin-top: 16px;
-  max-width: 36ch;
-}
 .hero-art {
   position: absolute;
   width: 47%;
@@ -617,6 +611,14 @@ svg {
   font-weight: 700;
   letter-spacing: -0.02em;
 }
+.merchant-story > .button {
+  margin-top: 28px;
+  background: var(--ink);
+  color: var(--on-dark);
+}
+.merchant-story > .button:not(:disabled):hover {
+  background: var(--tile);
+}
 .editorial-link {
   display: inline-flex;
   align-items: center;
@@ -679,7 +681,7 @@ svg {
   font-size: clamp(80px, 13vw, 208px);
   line-height: 0.9;
 }
-.closing-copy > p:not(.pilot-note) {
+.closing-copy > p {
   margin-top: 40px;
   font-size: 24px;
 }
@@ -870,9 +872,6 @@ svg {
   .hero-action {
     margin-top: 24px;
   }
-  .hero .pilot-note {
-    max-width: 30ch;
-  }
   .hero-art {
     position: relative;
     width: 88%;
@@ -1027,7 +1026,7 @@ svg {
   .closing h2 {
     font-size: 22vw;
   }
-  .closing-copy > p:not(.pilot-note) {
+  .closing-copy > p {
     margin-top: 28px;
     font-size: 20px;
   }

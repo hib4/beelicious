@@ -12,8 +12,8 @@ export const metadata: Metadata = {
     : {}),
   title: 'Beelicious — Lapar? Chat Aja. Makanan Siap!',
   description:
-    'Kenali Beelicious, platform pemesanan makanan lewat WhatsApp. Pilih tenant, jelajahi menu, dan atur pickup dalam satu percakapan. Saat ini dalam tahap pilot.',
-  robots: { index: false, follow: false },
+    'Kenali Beelicious, platform pemesanan makanan lewat WhatsApp. Pilih tenant, jelajahi menu, dan atur pickup dalam satu percakapan.',
+  robots: { index: true, follow: true },
   openGraph: {
     type: 'website',
     locale: 'id_ID',

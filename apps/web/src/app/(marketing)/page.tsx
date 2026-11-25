@@ -28,9 +28,6 @@ export default function Home() {
               <div className="hero-action">
                 <WhatsAppCta />
               </div>
-              <p className="pilot-note">
-                Pilot terbatas untuk pengguna yang diundang.
-              </p>
             </div>
             <div className="hero-art">
               <Mascot />
@@ -91,11 +88,7 @@ export default function Home() {
           </div>
         </section>
         <Journey />
-        <section
-          className="merchant-editorial"
-          id="tenant"
-          aria-label="Tenant pilot"
-        >
+        <section className="merchant-editorial" id="tenant" aria-label="Tenant">
           {merchants.map((merchant) => (
             <MerchantSpotlight key={merchant.name} merchant={merchant} />
           ))}
@@ -142,9 +135,6 @@ export default function Home() {
                 Mulai dari satu “Halo”.
               </p>
               <WhatsAppCta />
-              <p className="pilot-note">
-                Akses pilot terbatas. Belum melayani pembayaran produksi.
-              </p>
             </div>
             <Mascot closing />
           </div>
@@ -176,8 +166,7 @@ export default function Home() {
             </nav>
             <p>
               Beelicious
-              <br />
-              Pilot pengembangan
+              <br />© 2026
             </p>
           </div>
         </div>

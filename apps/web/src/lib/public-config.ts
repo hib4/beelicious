@@ -31,8 +31,10 @@ export function resolvePublicConfig(input: {
     siteUrl,
   };
 }
+/** Production ordering number (+62 819-4031-422); env values override it. */
+export const PRODUCTION_WHATSAPP_NUMBER = '628194031422';
 export const publicConfig = resolvePublicConfig({
-  number: process.env.NEXT_PUBLIC_WHATSAPP_NUMBER,
-  enabled: process.env.NEXT_PUBLIC_ORDERING_ENABLED,
+  number: process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || PRODUCTION_WHATSAPP_NUMBER,
+  enabled: process.env.NEXT_PUBLIC_ORDERING_ENABLED || 'true',
   siteUrl: process.env.NEXT_PUBLIC_SITE_URL,
 });

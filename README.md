@@ -37,9 +37,9 @@ npm run dev:web
 npm run dev
 ```
 
-For invited pilot users, set `NEXT_PUBLIC_ORDERING_ENABLED=true` and `NEXT_PUBLIC_WHATSAPP_NUMBER` to the connected WhatsApp account's international number (digits only). Backend approved-contact restrictions still apply. Missing/invalid numbers or disabled ordering show **Segera Hadir**. Links prefill **Halo**; the website never sends messages itself. Public configuration is embedded at build time, so rebuild after changes. Never put credentials or JIDs in these variables.
+Ordering is enabled by default and links to the production number `628194031422` (+62 819-4031-422). `NEXT_PUBLIC_WHATSAPP_NUMBER` (international, digits only) overrides the number and `NEXT_PUBLIC_ORDERING_ENABLED=false` disables ordering; an invalid number or disabled ordering shows **Segera Hadir**. Backend approved-contact restrictions still apply. Links prefill **Halo**; the website never sends messages itself. Public configuration is embedded at build time, so rebuild after changes. Never put credentials or JIDs in these variables.
 
-`NEXT_PUBLIC_SITE_URL` optionally supplies the real HTTPS origin for canonical/social/sitemap URLs. The pilot remains `noindex` with robots disallowing crawling. No production launch is implied.
+`NEXT_PUBLIC_SITE_URL` optionally supplies the real HTTPS origin for canonical/social/sitemap URLs. The landing page is indexable; robots.txt disallows only `/dashboard`, `/login` and `/api`, which also stay `noindex`.
 
 ```bash
 npm run build:web

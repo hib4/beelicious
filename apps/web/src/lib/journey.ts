@@ -64,7 +64,6 @@ export const journeySteps: readonly JourneyStep[] = [
     customer: '1',
     response:
       'Pembayaran QRIS\n\nTotal: Rp30.000\n\nCEK — Periksa pembayaran\nBATAL — Minta pembatalan',
-    detail:
-      'Pilot menggunakan simulasi atau Midtrans Sandbox, bukan pembayaran produksi.',
+    detail: 'Konfirmasi dikirim otomatis setelah pembayaran terverifikasi.',
   },
 ];
