@@ -63,12 +63,8 @@ export async function dashboardApi<T>(
       'content-type': 'application/json',
       'x-tenant-id': tenant,
     },
-    ...(options.body
-      ? { body: JSON.stringify(options.body) }
-      : {}),
-    ...(options.signal
-      ? { signal: options.signal }
-      : {}),
+    ...(options.body ? { body: JSON.stringify(options.body) } : {}),
+    ...(options.signal ? { signal: options.signal } : {}),
     cache: 'no-store',
   });
 
@@ -76,8 +72,7 @@ export async function dashboardApi<T>(
 
   if (!response.ok) {
     throw new ApiError(
-      json.error?.message ??
-        'Layanan tidak tersedia. Coba kembali.',
+      json.error?.message ?? 'Layanan tidak tersedia. Coba kembali.',
       response.status,
     );
   }
@@ -104,7 +99,6 @@ export function useWorkspace() {
   return value;
 }
 
-
 // ============================================
 // DASHBOARD QUERY
 // ============================================
@@ -120,8 +114,7 @@ export function useDashboardQuery<T>(
   return useQuery({
     queryKey: ['dashboard', tenant, name, path],
 
-    queryFn: ({ signal }) =>
-      dashboardApi<T>(path, tenant, { signal }),
+    queryFn: ({ signal }) => dashboardApi<T>(path, tenant, { signal }),
 
     enabled,
 
@@ -135,10 +128,8 @@ export function useDashboardQuery<T>(
     staleTime: 2000,
 
     retry: (count, error) =>
-      !(
-        error instanceof ApiError &&
-        [401, 403, 404].includes(error.status)
-      ) && count < 1,
+      !(error instanceof ApiError && [401, 403, 404].includes(error.status)) &&
+      count < 1,
   });
 }
 
@@ -157,9 +148,7 @@ export function WorkspaceProvider({
 
   return (
     <QueryClientProvider client={client}>
-      <Shell account={account}>
-        {children}
-      </Shell>
+      <Shell account={account}>{children}</Shell>
     </QueryClientProvider>
   );
 }
@@ -200,16 +189,11 @@ function Shell({
   const client = useQueryClient();
 
   const member =
-    memberships?.find(
-      (m) => m.tenantId === selected,
-    ) ?? memberships?.[0];
+    memberships?.find((m) => m.tenantId === selected) ?? memberships?.[0];
 
   // Redirect ke login jika session tidak valid.
   useEffect(() => {
-    if (
-      query.error instanceof ApiError &&
-      query.error.status === 401
-    ) {
+    if (query.error instanceof ApiError && query.error.status === 401) {
       client.clear();
       router.replace('/login');
     }
@@ -230,13 +214,9 @@ function Shell({
       <main id="main" className="dashboard dash-loading">
         <h1>Akses belum tersedia</h1>
 
-        <p role="alert">
-          {query.error.message}
-        </p>
+        <p role="alert">{query.error.message}</p>
 
-        <button onClick={() => query.refetch()}>
-          Coba kembali
-        </button>
+        <button onClick={() => query.refetch()}>Coba kembali</button>
 
         <form action={logout}>
           <button>Keluar</button>
@@ -251,10 +231,7 @@ function Shell({
       <main id="main" className="dashboard dash-loading">
         <h1>Belum ada akses tenant</h1>
 
-        <p>
-          Hubungi pengelola untuk menghubungkan akun ini
-          dengan tenant.
-        </p>
+        <p>Hubungi pengelola untuk menghubungkan akun ini dengan tenant.</p>
 
         <form action={logout}>
           <button>Keluar</button>
@@ -274,13 +251,7 @@ function Shell({
     ['/dashboard/pickup', 'Jadwal Pickup', CalendarDays],
 
     ...(member.role === 'OWNER'
-      ? [
-          [
-            '/dashboard/settings',
-            'Pengaturan',
-            Settings,
-          ] as const,
-        ]
+      ? [['/dashboard/settings', 'Pengaturan', Settings] as const]
       : []),
   ] as const;
 
@@ -296,32 +267,20 @@ function Shell({
       }}
     >
       <div className="dashboard dash-shell">
-
         {/* MOBILE HEADER */}
 
         <header className="dash-mobile">
-          <Link
-            className="dash-brand"
-            href="/dashboard"
-          >
+          <Link className="dash-brand" href="/dashboard">
             beelicious.
           </Link>
 
           <button
-            aria-label={
-              open
-                ? 'Tutup navigasi'
-                : 'Buka navigasi'
-            }
+            aria-label={open ? 'Tutup navigasi' : 'Buka navigasi'}
             aria-expanded={open}
             aria-controls="dash-sidebar"
             onClick={() => setOpen(!open)}
           >
-            {open ? (
-              <X size={20} />
-            ) : (
-              <Menu size={20} />
-            )}
+            {open ? <X size={20} /> : <Menu size={20} />}
           </button>
         </header>
 
@@ -329,14 +288,9 @@ function Shell({
 
         <aside
           id="dash-sidebar"
-          className={`dash-sidebar${
-            open ? ' is-open' : ''
-          }`}
+          className={`dash-sidebar${open ? ' is-open' : ''}`}
         >
-          <Link
-            href="/dashboard"
-            className="dash-brand"
-          >
+          <Link href="/dashboard" className="dash-brand">
             beelicious.
           </Link>
 
@@ -345,7 +299,6 @@ function Shell({
           {memberships && memberships.length > 1 ? (
             <label>
               Tenant
-
               <select
                 value={member.tenantId}
                 onChange={(e) => {
@@ -362,31 +315,22 @@ function Shell({
                 }}
               >
                 {memberships.map((m) => (
-                  <option
-                    key={m.tenantId}
-                    value={m.tenantId}
-                  >
+                  <option key={m.tenantId} value={m.tenantId}>
                     {m.tenant.name}
                   </option>
                 ))}
               </select>
             </label>
           ) : (
-            <p className="dash-tenant">
-              {member.tenant.name}
-            </p>
+            <p className="dash-tenant">{member.tenant.name}</p>
           )}
 
           {/* TENANT ROLE */}
 
           <p className="dash-muted dash-role-badge">
-            {member.role === 'OWNER'
-              ? 'Pemilik'
-              : 'Staf'}
+            {member.role === 'OWNER' ? 'Pemilik' : 'Staf'}
 
-            {!member.tenant.isActive
-              ? ' · Tenant nonaktif'
-              : ''}
+            {!member.tenant.isActive ? ' · Tenant nonaktif' : ''}
           </p>
 
           {/* NAVIGATION */}
@@ -397,11 +341,7 @@ function Shell({
                 key={url}
                 href={url}
                 aria-current={
-                  (
-                    url === '/dashboard'
-                      ? path === url
-                      : path.startsWith(url)
-                  )
+                  (url === '/dashboard' ? path === url : path.startsWith(url))
                     ? 'page'
                     : undefined
                 }
@@ -418,14 +358,9 @@ function Shell({
           <div className="dash-account">
             <span>{account}</span>
 
-            <Link href="/dashboard/password">
-              Ganti kata sandi
-            </Link>
+            <Link href="/dashboard/password">Ganti kata sandi</Link>
 
-            <form
-              action={logout}
-              onSubmit={() => client.clear()}
-            >
+            <form action={logout} onSubmit={() => client.clear()}>
               <button>Keluar</button>
             </form>
           </div>
@@ -433,14 +368,9 @@ function Shell({
 
         {/* MAIN CONTENT */}
 
-        <main
-          id="main"
-          className="dash-content"
-          key={member.tenantId}
-        >
+        <main id="main" className="dash-content" key={member.tenantId}>
           {children}
         </main>
-
       </div>
     </Workspace.Provider>
   );
@@ -463,32 +393,21 @@ export function QueryState({
   const client = useQueryClient();
 
   useEffect(() => {
-    if (
-      error instanceof ApiError &&
-      error.status === 401
-    ) {
+    if (error instanceof ApiError && error.status === 401) {
       client.clear();
       router.replace('/login');
     }
   }, [error, router, client]);
 
   return pending ? (
-    <div
-      className="dash-skeleton"
-      role="status"
-    >
+    <div className="dash-skeleton" role="status">
       Memuat data…
     </div>
   ) : error ? (
-    <div
-      className="dash-error"
-      role="alert"
-    >
+    <div className="dash-error" role="alert">
       <p>{error.message}</p>
 
-      <button onClick={refresh}>
-        Coba kembali
-      </button>
+      <button onClick={refresh}>Coba kembali</button>
     </div>
   ) : null;
 }
@@ -513,11 +432,7 @@ export function PageHeading({
         <p>{description}</p>
       </div>
 
-      {refresh && (
-        <button onClick={refresh}>
-          Muat ulang
-        </button>
-      )}
+      {refresh && <button onClick={refresh}>Muat ulang</button>}
     </header>
   );
 }
@@ -543,17 +458,11 @@ export function Pagination({
         {total} hasil · Halaman {page}
       </span>
 
-      <button
-        disabled={page <= 1}
-        onClick={() => onPage(page - 1)}
-      >
+      <button disabled={page <= 1} onClick={() => onPage(page - 1)}>
         Sebelumnya
       </button>
 
-      <button
-        disabled={page * size >= total}
-        onClick={() => onPage(page + 1)}
-      >
+      <button disabled={page * size >= total} onClick={() => onPage(page + 1)}>
         Berikutnya
       </button>
     </div>
@@ -604,15 +513,44 @@ export const stageLabels: Record<string, string> = {
 };
 
 // ============================================
+// PAYMENT SOURCE LABEL
+// ============================================
+
+export function paymentSourceLabel(
+  payment: { provider: string } | null | undefined,
+) {
+  if (!payment) return 'Belum ada pembayaran';
+  if (payment.provider === 'mock') return 'Pembayaran simulasi';
+  if (payment.provider === 'midtrans') return 'Midtrans Sandbox';
+  return payment.provider;
+}
+
+// ============================================
+// NOTIFICATION LABELS
+// ============================================
+
+export const notificationKindLabels: Record<string, string> = {
+  fulfillment: 'Pemenuhan',
+  qr: 'Instruksi pembayaran',
+  text: 'Checkout',
+};
+
+export const notificationStateLabels: Record<string, string> = {
+  pending: 'Menunggu dikirim',
+  processing: 'Diproses',
+  sending: 'Mengirim',
+  sent: 'Terkirim',
+  completed: 'Terkirim',
+  ignored: 'Tidak dikirim',
+  failed: 'Gagal dikirim',
+  uncertain: 'Status kirim tidak pasti',
+};
+
+// ============================================
 // STATUS COMPONENT
 // ============================================
 
-
-export function Status({
-  value,
-}: {
-  value: string | null;
-}) {
+export function Status({ value }: { value: string | null }) {
   const statusClasses: Record<string, string> = {
     // Payment status
     SUCCEEDED: 'is-paid',
@@ -634,13 +572,9 @@ export function Status({
 
   return (
     <span
-      className={`dash-status ${
-        value ? statusClasses[value] ?? '' : ''
-      }`}
+      className={`dash-status ${value ? (statusClasses[value] ?? '') : ''}`}
     >
-      {value
-        ? stageLabels[value] ?? value
-        : 'Belum tersedia'}
+      {value ? (stageLabels[value] ?? value) : 'Belum tersedia'}
     </span>
   );
 }

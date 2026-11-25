@@ -89,10 +89,12 @@ test('menu edits and availability persist; tenant switching clears workspace dat
   await expect(
     page.locator('.dash-menu-row').getByText(/25\.000/),
   ).toBeVisible();
-  await page.getByRole('button', { name: /Nasi Uji: tersedia/ }).click();
-  await expect(
-    page.getByRole('button', { name: /Nasi Uji: tidak tersedia/ }),
-  ).toBeVisible();
+  const availability = page.getByRole('switch', {
+    name: 'Ketersediaan Nasi Uji',
+  });
+  await expect(availability).toHaveAttribute('aria-checked', 'true');
+  await availability.click();
+  await expect(availability).toHaveAttribute('aria-checked', 'false');
   await page
     .locator('.dash-sidebar')
     .getByRole('combobox', { name: 'Tenant', exact: true })

@@ -1,6 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
-import { OrderRows } from '@/components/dashboard/orders';
+import { OrderRows, OverviewScreen } from '@/components/dashboard/orders';
+import {
+  paymentSourceLabel,
+  WorkspaceProvider,
+} from '@/components/dashboard/workspace';
 import {
   Pagination,
   QueryState,
@@ -80,4 +84,77 @@ it('paginates bounded lists and gives statuses readable labels', () => {
   expect(change).toHaveBeenCalledWith(2);
   expect(screen.getByText('Siap diambil')).toBeVisible();
   expect(money(20000)).toContain('20.000');
+});
+
+it('labels payment sources honestly and offers acceptance for new orders', () => {
+  expect(paymentSourceLabel(null)).toBe('Belum ada pembayaran');
+  expect(paymentSourceLabel({ provider: 'midtrans' })).toBe('Midtrans Sandbox');
+  const order = {
+    id: 'new-order',
+    orderNumber: 'BEE-NEW',
+    tenantName: 'Bakmi Effata',
+    placedAt: '2026-10-21T02:00:00Z',
+    pickupSlot: { startsAt: '2026-10-21T04:00:00Z' },
+    payment: null,
+    fulfillmentStatus: 'NEW',
+    customer: { displayName: null },
+    totalAmount: 25000,
+    items: [],
+  } as unknown as DashboardOrder;
+  render(<OrderRows orders={[order]} />);
+  expect(screen.getByRole('link', { name: 'Terima pesanan' })).toBeVisible();
+  expect(screen.getByText('Belum ada pembayaran')).toBeVisible();
+  expect(screen.queryByText('Midtrans Sandbox')).toBeNull();
+});
+
+it('greets the signed-in tenant with real data and hides an empty queue banner', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-11-25T09:30:00Z')); // 16:30 WIB
+  const overview = {
+    paidToday: 0,
+    awaitingAcceptance: 0,
+    accepted: 0,
+    preparing: 0,
+    ready: 0,
+    requiresReview: 0,
+    completedToday: 0,
+    paidGross: 0,
+    providers: [],
+    recent: [],
+    asOf: '2026-11-25T09:30:00Z',
+    timezone: 'Asia/Jakarta',
+  };
+  const memberships = [
+    {
+      tenantId: 'tenant-1',
+      role: 'OWNER',
+      canManageAvailability: true,
+      tenant: { name: 'Bakmi Effata', isActive: true },
+    },
+  ];
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string) => ({
+      ok: true,
+      json: async () => ({
+        data: url.endsWith('/memberships') ? memberships : overview,
+      }),
+    })),
+  );
+  render(
+    <WorkspaceProvider account="owner@example.test">
+      <OverviewScreen />
+    </WorkspaceProvider>,
+  );
+  expect(
+    await screen.findByRole('heading', { level: 1, name: 'Ringkasan' }),
+  ).toBeVisible();
+  expect(
+    await screen.findByText(/Selamat sore, tim Bakmi Effata/),
+  ).toBeVisible();
+  expect(document.body.textContent).not.toMatch(/Agus/);
+  expect(screen.queryByText(/pesanan menunggu diterima/)).toBeNull();
+  expect(screen.queryByText('SANDBOX')).toBeNull();
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
 });

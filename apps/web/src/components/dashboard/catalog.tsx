@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import Link from 'next/link';
 import { CalendarDays, Info, Plus, RefreshCw, Search } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type {
@@ -68,6 +69,13 @@ export function MenuScreen() {
       },
     });
   }
+  // Counts are only exact when the unfiltered catalog fits on one page.
+  const countsComplete =
+    !!q.data &&
+    !search &&
+    !category &&
+    page === 1 &&
+    q.data.total <= q.data.items.length;
   const categoryCounts = new Map<string, number>();
   q.data?.items.forEach((item) => {
     categoryCounts.set(
@@ -139,7 +147,8 @@ export function MenuScreen() {
                 setPage(1);
               }}
             >
-              {c.name} <span>{categoryCounts.get(c.id) ?? 0}</span>
+              {c.name}
+              {countsComplete && <span>{categoryCounts.get(c.id) ?? 0}</span>}
             </button>
           ))}
         </div>
@@ -372,7 +381,9 @@ export function MenuScreen() {
                     key={`${c.id}:${c.updatedAt}`}
                     category={c}
                     pending={mutation.isPending}
-                    count={categoryCounts.get(c.id) ?? 0}
+                    count={
+                      countsComplete ? (categoryCounts.get(c.id) ?? 0) : null
+                    }
                     save={(body) =>
                       mutation.mutate({
                         path: `categories/${c.id}`,
@@ -385,7 +396,9 @@ export function MenuScreen() {
                   <div key={c.id} className="dash-category-grid">
                     <span>{c.sortOrder}</span>
                     <strong>{c.name}</strong>
-                    <span>{categoryCounts.get(c.id) ?? 0}</span>
+                    <span>
+                      {countsComplete ? (categoryCounts.get(c.id) ?? 0) : '—'}
+                    </span>
                     <span>{c.isActive ? 'Aktif' : 'Nonaktif'}</span>
                     <span />
                   </div>
@@ -445,7 +458,7 @@ function CategoryEditor({
 }: {
   category: Category;
   pending: boolean;
-  count: number;
+  count: number | null;
   save: (body: unknown) => void;
 }) {
   return (
@@ -477,7 +490,7 @@ function CategoryEditor({
           aria-label="Nama kategori"
         />
       </label>
-      <span className="dash-category-count">{count}</span>
+      <span className="dash-category-count">{count ?? '—'}</span>
       <label className="dash-category-active">
         <input
           name="isActive"
@@ -550,6 +563,8 @@ export function PickupScreen() {
     mutationFn: ({ path, body }: { path: string; body: unknown }) =>
       dashboardApi(path, tenant, { method: 'PATCH', body }),
     onSuccess: () => {
+      setSlotAvailability({});
+      setHoursOpen({});
       setNotice(
         'Perubahan jadwal tersimpan. Reservasi yang ada tetap dilindungi.',
       );
@@ -651,10 +666,7 @@ export function PickupScreen() {
             </div>
             <div className="dash-pickup-callout">
               <Info size={18} aria-hidden="true" />
-              <p>
-                Reservasi menunggu verifikasi tetap memakai kapasitas. Jadwal
-                dan kapasitas pilot adalah konfigurasi pengembangan.
-              </p>
+              <p>Reservasi menunggu verifikasi tetap memakai kapasitas.</p>
             </div>
             <div className="dash-pickup-table-wrap">
               <div
@@ -779,7 +791,6 @@ export function PickupScreen() {
                               name="isAvailable"
                               type="checkbox"
                               role="switch"
-                              aria-checked={available}
                               aria-label={
                                 'Buka slot ' +
                                 slotClock(s.startsAt) +
@@ -890,7 +901,7 @@ export function PickupScreen() {
                             String(f.get('closesAt')) === '24:00'
                               ? 1440
                               : minutes(String(f.get('closesAt'))),
-                          isClosed: f.get('isClosed') === 'on',
+                          isClosed: f.get('isOpen') !== 'on',
                           updatedAt: h.updatedAt,
                         },
                       })
@@ -925,17 +936,16 @@ export function PickupScreen() {
                     </label>
                     <label className="dash-hours-switch">
                       <input
-                        name="isClosed"
+                        name="isOpen"
                         type="checkbox"
                         role="switch"
-                        aria-checked={isOpen}
                         aria-label={'Buka ' + dayNames[h.dayOfWeek]}
-                        defaultChecked={h.isClosed}
+                        defaultChecked={!h.isClosed}
                         onChange={(event) => {
                           const checked = event.currentTarget.checked;
                           setHoursOpen((current) => ({
                             ...current,
-                            [h.id]: !checked,
+                            [h.id]: checked,
                           }));
                         }}
                       />
@@ -1073,8 +1083,9 @@ export function SettingsScreen() {
             <input value={q.data.timezone} readOnly />
           </label>
           <p>
-            Kelola jam operasional melalui halaman{' '}
-            <a href="/dashboard/pickup#operating-hours">Jadwal Pickup</a>.
+            Kelola jam operasional melalui{' '}
+            <Link href="/dashboard/pickup">Jadwal Pickup</Link>, tab Jam
+            operasional.
           </p>
           <button className="dash-primary" disabled={mutation.isPending}>
             Simpan profil

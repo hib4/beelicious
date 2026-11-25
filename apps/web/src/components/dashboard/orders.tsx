@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { BellRing } from 'lucide-react';
 
 import type { DashboardOrder, Overview, PageResult } from '@beelicious/shared';
 
@@ -17,21 +18,21 @@ import {
   time,
   Status,
   stageLabels,
+  paymentSourceLabel,
+  notificationKindLabels,
+  notificationStateLabels,
 } from './workspace';
 
 // =====================================================
 // ORDER ROWS
 // =====================================================
 
-// =====================================================
-// ORDER ROWS
-// =====================================================
-
+// Label of the next fulfillment step for a row's current stage.
 const orderActionLabels: Record<string, string> = {
+  NEW: 'Terima pesanan',
   ACCEPTED: 'Mulai siapkan',
   PREPARING: 'Tandai siap',
   READY_FOR_PICKUP: 'Selesaikan',
-  COMPLETED: 'Selesai',
 };
 
 function formatPickupTime(value: string) {
@@ -78,16 +79,18 @@ export function OrderRows({ orders }: { orders: DashboardOrder[] }) {
             const pickup = formatPickupTime(order.pickupSlot.startsAt);
 
             const rowStatus =
-              fulfillment === 'ACCEPTED'
-                ? 'is-accepted'
-                : fulfillment === 'PREPARING'
-                  ? 'is-preparing'
-                  : fulfillment === 'READY_FOR_PICKUP'
-                    ? 'is-ready'
-                    : '';
+              fulfillment === 'NEW'
+                ? 'is-new'
+                : fulfillment === 'ACCEPTED'
+                  ? 'is-accepted'
+                  : fulfillment === 'PREPARING'
+                    ? 'is-preparing'
+                    : fulfillment === 'READY_FOR_PICKUP'
+                      ? 'is-ready'
+                      : '';
 
             const actionStyle =
-              fulfillment === 'ACCEPTED'
+              fulfillment === 'NEW' || fulfillment === 'ACCEPTED'
                 ? 'is-yellow'
                 : fulfillment === 'PREPARING'
                   ? 'is-dark'
@@ -136,11 +139,7 @@ export function OrderRows({ orders }: { orders: DashboardOrder[] }) {
                     <Status value={fulfillment} />
                   </div>
 
-                  <small>
-                    {order.payment?.provider === 'mock'
-                      ? 'Pembayaran simulasi'
-                      : 'Midtrans Sandbox'}
-                  </small>
+                  <small>{paymentSourceLabel(order.payment)}</small>
                 </td>
 
                 <td className="numeric">{money(order.totalAmount)}</td>
@@ -170,7 +169,31 @@ export function OrderRows({ orders }: { orders: DashboardOrder[] }) {
 // OVERVIEW SCREEN
 // =====================================================
 
+function jakartaGreeting(now: Date) {
+  const hour = Number(
+    new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Jakarta',
+      hour: '2-digit',
+      hourCycle: 'h23',
+    }).format(now),
+  );
+  if (hour >= 4 && hour < 11) return 'Selamat pagi';
+  if (hour >= 11 && hour < 15) return 'Selamat siang';
+  if (hour >= 15 && hour < 18) return 'Selamat sore';
+  return 'Selamat malam';
+}
+
+function providerBadge(providers: string[]) {
+  const mock = providers.includes('mock');
+  const sandbox = providers.some((provider) => provider !== 'mock');
+  if (mock && sandbox) return 'MOCK + SANDBOX';
+  if (mock) return 'MOCK';
+  if (sandbox) return 'SANDBOX';
+  return null;
+}
+
 export function OverviewScreen() {
+  const { membership } = useWorkspace();
   const q = useDashboardQuery<Overview>('overview', 'overview', true);
 
   const data = q.data;
@@ -193,26 +216,23 @@ export function OverviewScreen() {
       hour12: false,
     }).format(new Date(value));
 
+  const now = new Date();
+
   const today = new Intl.DateTimeFormat('id-ID', {
     timeZone: 'Asia/Jakarta',
     weekday: 'long',
     day: 'numeric',
     month: 'long',
     year: 'numeric',
-  }).format(new Date());
+  }).format(now);
 
-  const actionLabels: Record<string, string> = {
-    ACCEPTED: 'Mulai siapkan',
-    PREPARING: 'Tandai siap',
-    READY_FOR_PICKUP: 'Selesaikan',
-    COMPLETED: 'Selesai',
-  };
+  const badge = data ? providerBadge(data.providers) : null;
 
   return (
     <div className="dash-overview">
       <PageHeading
-        title="Selamat siang, Agus"
-        description={`${today} · Operasional hari ini · Asia/Jakarta`}
+        title="Ringkasan"
+        description={`${jakartaGreeting(now)}, tim ${membership.tenant.name} · ${today} · WIB`}
         refresh={() => {
           void q.refetch();
         }}
@@ -229,25 +249,27 @@ export function OverviewScreen() {
       {data && (
         <>
           {/* BANNER PESANAN MENUNGGU */}
-          <section className="dash-overview-alert">
-            <div className="dash-overview-alert-icon">
-              <span>♟</span>
-            </div>
+          {data.awaitingAcceptance > 0 && (
+            <section className="dash-overview-alert">
+              <div className="dash-overview-alert-icon" aria-hidden="true">
+                <BellRing size={18} />
+              </div>
 
-            <div className="dash-overview-alert-content">
-              <strong>
-                {data.awaitingAcceptance} pesanan menunggu diterima
-              </strong>
-              <p>Segera konfirmasi pesanan agar pickup tetap tepat waktu.</p>
-            </div>
+              <div className="dash-overview-alert-content">
+                <strong>
+                  {data.awaitingAcceptance} pesanan menunggu diterima
+                </strong>
+                <p>Segera konfirmasi pesanan agar pickup tetap tepat waktu.</p>
+              </div>
 
-            <Link
-              href="/dashboard/orders"
-              className="dash-overview-alert-button"
-            >
-              Lihat pesanan
-            </Link>
-          </section>
+              <Link
+                href="/dashboard/orders"
+                className="dash-overview-alert-button"
+              >
+                Lihat pesanan
+              </Link>
+            </section>
+          )}
 
           {/* ALUR PESANAN */}
           <section className="dash-overview-flow">
@@ -297,10 +319,10 @@ export function OverviewScreen() {
           <section className="dash-overview-summary">
             <div className="dash-overview-gross">
               <div className="dash-overview-card-heading">
-                <span>Nilai bruto pembayaran berhasil</span>
-                <span className="dash-overview-mock-badge">
-                  {data.providers.includes('mock') ? 'MOCK' : 'SANDBOX'}
-                </span>
+                <h2>Nilai bruto pembayaran berhasil</h2>
+                {badge && (
+                  <span className="dash-overview-mock-badge">{badge}</span>
+                )}
               </div>
 
               {typeof data.paidGross === 'number' && (
@@ -347,7 +369,7 @@ export function OverviewScreen() {
             <Link href="/dashboard/orders" className="dash-overview-review">
               <span>Perlu pemeriksaan</span>
               <strong>{data.requiresReview}</strong>
-              <small>Periksa pembayaran</small>
+              <small>Periksa pesanan</small>
             </Link>
           </section>
 
@@ -375,7 +397,8 @@ export function OverviewScreen() {
                   {data.recent.map((order) => {
                     const fulfillment = order.fulfillmentStatus ?? order.status;
 
-                    const action = actionLabels[fulfillment] ?? 'Lihat detail';
+                    const action =
+                      orderActionLabels[fulfillment] ?? 'Lihat detail';
 
                     return (
                       <tr key={order.id}>
@@ -413,6 +436,7 @@ export function OverviewScreen() {
                           <Link
                             href={`/dashboard/orders/${order.id}`}
                             className={`dash-overview-action ${
+                              fulfillment === 'NEW' ||
                               fulfillment === 'ACCEPTED' ||
                               fulfillment === 'PREPARING'
                                 ? 'is-dark'
@@ -450,9 +474,13 @@ export function OverviewScreen() {
 // ORDERS SCREEN
 // =====================================================
 
-// =====================================================
-// ORDERS SCREEN
-// =====================================================
+const orderTabs = [
+  ['', 'Semua'],
+  ['NEW', 'Menunggu diterima'],
+  ['ACCEPTED', 'Diterima'],
+  ['PREPARING', 'Disiapkan'],
+  ['READY_FOR_PICKUP', 'Siap diambil'],
+] as const;
 
 export function OrdersScreen() {
   const [status, setStatus] = useState('');
@@ -480,23 +508,6 @@ export function OrdersScreen() {
 
   const displayedOrders = q.data?.items ?? [];
   const total = q.data?.total ?? 0;
-
-  // Quick status counts.
-  const countSource = displayedOrders;
-
-  const counts = {
-    all: countSource.length,
-    accepted: countSource.filter(
-      (order) => (order.fulfillmentStatus ?? order.status) === 'ACCEPTED',
-    ).length,
-    preparing: countSource.filter(
-      (order) => (order.fulfillmentStatus ?? order.status) === 'PREPARING',
-    ).length,
-    ready: countSource.filter(
-      (order) =>
-        (order.fulfillmentStatus ?? order.status) === 'READY_FOR_PICKUP',
-    ).length,
-  };
 
   const change = (fn: () => void) => {
     fn();
@@ -578,38 +589,19 @@ export function OrdersScreen() {
         </div>
 
         {/* QUICK STATUS FILTER */}
-        <div className="dash-order-tabs">
-          <button
-            type="button"
-            className={!status ? 'is-active' : ''}
-            onClick={() => change(() => setStatus(''))}
-          >
-            Semua <span>{counts.all}</span>
-          </button>
-
-          <button
-            type="button"
-            className={status === 'ACCEPTED' ? 'is-active' : ''}
-            onClick={() => change(() => setStatus('ACCEPTED'))}
-          >
-            Diterima <span>{counts.accepted}</span>
-          </button>
-
-          <button
-            type="button"
-            className={status === 'PREPARING' ? 'is-active' : ''}
-            onClick={() => change(() => setStatus('PREPARING'))}
-          >
-            Disiapkan <span>{counts.preparing}</span>
-          </button>
-
-          <button
-            type="button"
-            className={status === 'READY_FOR_PICKUP' ? 'is-active' : ''}
-            onClick={() => change(() => setStatus('READY_FOR_PICKUP'))}
-          >
-            Siap diambil <span>{counts.ready}</span>
-          </button>
+        <div className="dash-order-tabs" aria-label="Filter status cepat">
+          {orderTabs.map(([value, label]) => (
+            <button
+              key={value || 'all'}
+              type="button"
+              className={status === value ? 'is-active' : ''}
+              aria-pressed={status === value}
+              onClick={() => change(() => setStatus(value))}
+            >
+              {label}
+              {status === value && q.data && <span>{total}</span>}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -636,7 +628,7 @@ export function OrdersScreen() {
 // ORDER DETAIL CONSTANTS
 // =====================================================
 
-const actionLabels: Record<string, string> = {
+const transitionLabels: Record<string, string> = {
   ACCEPTED: 'Terima pesanan',
   PREPARING: 'Mulai siapkan',
   READY_FOR_PICKUP: 'Tandai siap diambil',
@@ -757,11 +749,8 @@ export function OrderDetailScreen({ id }: { id: string }) {
 
                 <dt>Pembayaran</dt>
                 <dd>
-                  <Status value={order.payment?.status ?? null} />
-
-                  {order.payment?.provider === 'mock'
-                    ? ' Mock (simulasi)'
-                    : ' Midtrans Sandbox'}
+                  <Status value={order.payment?.status ?? null} />{' '}
+                  {paymentSourceLabel(order.payment)}
                 </dd>
 
                 <dt>Pemenuhan</dt>
@@ -798,7 +787,8 @@ export function OrderDetailScreen({ id }: { id: string }) {
               {eligible && target ? (
                 <>
                   <p>
-                    Langkah berikutnya: {actionLabels[target]!.toLowerCase()}.
+                    Langkah berikutnya:{' '}
+                    {transitionLabels[target]!.toLowerCase()}.
                   </p>
 
                   <button
@@ -806,7 +796,7 @@ export function OrderDetailScreen({ id }: { id: string }) {
                     onClick={() => setConfirm(target)}
                     disabled={mutation.isPending}
                   >
-                    {actionLabels[target]}
+                    {transitionLabels[target]}
                   </button>
                 </>
               ) : (
@@ -862,15 +852,9 @@ export function OrderDetailScreen({ id }: { id: string }) {
               <ul className="dash-history">
                 {order.notifications.map((n, i) => (
                   <li key={i}>
-                    <span>
-                      {n.kind === 'fulfillment'
-                        ? 'Pemenuhan'
-                        : n.kind === 'qr'
-                          ? 'Instruksi pembayaran'
-                          : 'Checkout'}
-                    </span>
+                    <span>{notificationKindLabels[n.kind] ?? n.kind}</span>
 
-                    <span>{n.state}</span>
+                    <span>{notificationStateLabels[n.state] ?? n.state}</span>
 
                     <small>{time(n.createdAt)}</small>
                   </li>
@@ -887,7 +871,7 @@ export function OrderDetailScreen({ id }: { id: string }) {
                 title={
                   confirm === 'REQUIRES_REVIEW'
                     ? 'Laporkan kendala'
-                    : actionLabels[confirm]!
+                    : transitionLabels[confirm]!
                 }
                 close={() => setConfirm(null)}
               >
