@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { CalendarDays, Info, Plus, RefreshCw, Search } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type {
   CatalogItem,
@@ -16,7 +17,6 @@ import {
   QueryState,
   Pagination,
   money,
-  time,
 } from './workspace';
 export function MenuScreen() {
   const { tenant, membership } = useWorkspace();
@@ -68,19 +68,46 @@ export function MenuScreen() {
       },
     });
   }
+  const categoryCounts = new Map<string, number>();
+  q.data?.items.forEach((item) => {
+    categoryCounts.set(
+      item.categoryId,
+      (categoryCounts.get(item.categoryId) ?? 0) + 1,
+    );
+  });
   return (
-    <>
-      <PageHeading
-        title="Menu"
-        description="Kelola katalog dan ketersediaan menu tenant."
-        refresh={() => q.refetch()}
-      />
-      <div className="dash-filters">
-        <label>
-          Cari menu
+    <div className="dash-menu-page">
+      <header className="dash-heading dash-menu-heading">
+        <div>
+          <h1>Menu</h1>
+          <p>Kelola katalog dan ketersediaan menu tenant.</p>
+        </div>
+        <div className="dash-menu-heading-actions">
+          <button
+            className="dash-menu-icon-button"
+            aria-label="Muat ulang"
+            onClick={() => q.refetch()}
+          >
+            <RefreshCw size={18} aria-hidden="true" />
+          </button>
+          {owner && (
+            <button
+              className="dash-primary dash-menu-add"
+              onClick={() => setEditing(null)}
+            >
+              <Plus size={18} aria-hidden="true" /> Tambah menu
+            </button>
+          )}
+        </div>
+      </header>
+      <div className="dash-menu-toolbar">
+        <label className="dash-menu-search">
+          <span className="sr-only">Cari nama menu</span>
+          <Search size={18} aria-hidden="true" />
           <input
             type="search"
             maxLength={120}
+            placeholder="Cari nama menu…"
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -88,29 +115,34 @@ export function MenuScreen() {
             }}
           />
         </label>
-        <label>
-          Kategori
-          <select
-            value={category}
-            onChange={(e) => {
-              setCategory(e.target.value);
+        <div
+          className="dash-menu-category-filters"
+          aria-label="Filter kategori"
+        >
+          <button
+            className={!category ? 'is-active' : ''}
+            aria-pressed={!category}
+            onClick={() => {
+              setCategory('');
               setPage(1);
             }}
           >
-            <option value="">Semua kategori</option>
-            {q.data?.categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-                {!c.isActive ? ' (nonaktif)' : ''}
-              </option>
-            ))}
-          </select>
-        </label>
-        {owner && (
-          <button className="dash-primary" onClick={() => setEditing(null)}>
-            Tambah menu
+            Semua <span>{q.data?.total ?? 0}</span>
           </button>
-        )}
+          {q.data?.categories.map((c) => (
+            <button
+              key={c.id}
+              className={category === c.id ? 'is-active' : ''}
+              aria-pressed={category === c.id}
+              onClick={() => {
+                setCategory(c.id);
+                setPage(1);
+              }}
+            >
+              {c.name} <span>{categoryCounts.get(c.id) ?? 0}</span>
+            </button>
+          ))}
+        </div>
       </div>
       <QueryState
         pending={q.isPending}
@@ -226,22 +258,46 @@ export function MenuScreen() {
             </section>
           )}
           <div className="dash-menu-list">
+            <div className="dash-menu-columns" aria-hidden="true">
+              <span>Menu</span>
+              <span>Harga</span>
+              <span>Status</span>
+              <span />
+            </div>
             {q.data.items.map((item) => (
-              <article key={item.id} className="dash-menu-row">
-                <div>
-                  <h2>{item.name}</h2>
-                  <p>
-                    {
-                      q.data.categories.find((c) => c.id === item.categoryId)
-                        ?.name
-                    }
-                  </p>
-                  {item.description && <p>{item.description}</p>}
+              <article
+                key={item.id}
+                className={`dash-menu-row${item.isAvailable ? '' : ' is-unavailable'}`}
+              >
+                <div
+                  className={`dash-menu-thumb ${categoryTone(q.data.categories.find((c) => c.id === item.categoryId)?.name ?? '')}`}
+                  aria-hidden="true"
+                >
+                  {item.name.trim().charAt(0).toUpperCase()}
                 </div>
-                <strong className="numeric">{money(item.price)}</strong>
-                <div className="dash-actions">
+                <div className="dash-menu-info">
+                  <div className="dash-menu-title">
+                    <h2>{item.name}</h2>
+                    <span className="dash-menu-category-chip">
+                      {
+                        q.data.categories.find((c) => c.id === item.categoryId)
+                          ?.name
+                      }
+                    </span>
+                  </div>
+                  {item.description && (
+                    <p title={item.description}>{item.description}</p>
+                  )}
+                </div>
+                <strong className="dash-menu-price numeric">
+                  {money(item.price)}
+                </strong>
+                <div className="dash-menu-status">
                   <button
-                    aria-label={`${item.name}: ${item.isAvailable ? 'tersedia, ubah menjadi tidak tersedia' : 'tidak tersedia, ubah menjadi tersedia'}`}
+                    className="dash-switch"
+                    role="switch"
+                    aria-checked={item.isAvailable}
+                    aria-label={`Ketersediaan ${item.name}`}
                     disabled={
                       mutation.isPending ||
                       (!owner && !membership.canManageAvailability)
@@ -257,54 +313,88 @@ export function MenuScreen() {
                       })
                     }
                   >
-                    {item.isAvailable ? 'Tersedia' : 'Tidak tersedia'}
+                    <span className="dash-switch-track" aria-hidden="true">
+                      <span />
+                    </span>
                   </button>
-                  {owner && (
-                    <button onClick={() => setEditing(item)}>Edit</button>
-                  )}
+                  <span>
+                    {item.isAvailable ? 'Tersedia' : 'Tidak tersedia'}
+                  </span>
                 </div>
+                {owner ? (
+                  <button
+                    className="dash-menu-edit"
+                    onClick={() => setEditing(item)}
+                  >
+                    Edit
+                  </button>
+                ) : (
+                  <span />
+                )}
               </article>
             ))}
             {!q.data.items.length && (
               <p className="dash-empty">Belum ada menu pada pilihan ini.</p>
             )}
           </div>
-          <Pagination
-            page={page}
-            size={25}
-            total={q.data.total}
-            onPage={setPage}
-          />
-          <section className="dash-section">
-            <h2>Kategori & urutan</h2>
-            <p className="dash-muted">
-              Urutan lebih kecil ditampilkan lebih awal. Kategori nonaktif
-              disembunyikan dari pelanggan.
-            </p>
-            {q.data.categories.map((c) =>
-              owner ? (
-                <CategoryEditor
-                  key={`${c.id}:${c.updatedAt}`}
-                  category={c}
-                  pending={mutation.isPending}
-                  save={(body) =>
-                    mutation.mutate({
-                      path: `categories/${c.id}`,
-                      method: 'PATCH',
-                      body,
-                    })
-                  }
-                />
-              ) : (
-                <p key={c.id}>
-                  {c.sortOrder}. {c.name}
-                  {!c.isActive ? ' (nonaktif)' : ''}
-                </p>
-              ),
+          <div className="dash-menu-results">
+            {q.data.total <= 25 && <span>{q.data.total} menu</span>}
+            {q.data.total > 25 && (
+              <Pagination
+                page={page}
+                size={25}
+                total={q.data.total}
+                onPage={setPage}
+              />
             )}
+          </div>
+          <section className="dash-menu-categories">
+            <header>
+              <div>
+                <h2>Kategori &amp; urutan</h2>
+                <p>
+                  Urutan lebih kecil ditampilkan lebih awal. Kategori nonaktif
+                  disembunyikan dari pelanggan.
+                </p>
+              </div>
+            </header>
+            <div className="dash-category-table">
+              <div className="dash-category-grid dash-category-head">
+                <span>Urutan</span>
+                <span>Nama kategori</span>
+                <span>Jumlah menu</span>
+                <span>Status</span>
+                <span />
+              </div>
+              {q.data.categories.map((c) =>
+                owner ? (
+                  <CategoryEditor
+                    key={`${c.id}:${c.updatedAt}`}
+                    category={c}
+                    pending={mutation.isPending}
+                    count={categoryCounts.get(c.id) ?? 0}
+                    save={(body) =>
+                      mutation.mutate({
+                        path: `categories/${c.id}`,
+                        method: 'PATCH',
+                        body,
+                      })
+                    }
+                  />
+                ) : (
+                  <div key={c.id} className="dash-category-grid">
+                    <span>{c.sortOrder}</span>
+                    <strong>{c.name}</strong>
+                    <span>{categoryCounts.get(c.id) ?? 0}</span>
+                    <span>{c.isActive ? 'Aktif' : 'Nonaktif'}</span>
+                    <span />
+                  </div>
+                ),
+              )}
+            </div>
             {owner && (
               <form
-                className="dash-inline-form"
+                className="dash-inline-form dash-category-add"
                 action={(form) =>
                   mutation.mutate({
                     path: 'categories',
@@ -330,27 +420,37 @@ export function MenuScreen() {
                     required
                   />
                 </label>
-                <button disabled={mutation.isPending}>Tambah kategori</button>
+                <button className="dash-primary" disabled={mutation.isPending}>
+                  Tambah kategori
+                </button>
               </form>
             )}
           </section>
         </>
       )}
-    </>
+    </div>
   );
+}
+function categoryTone(name: string) {
+  if (name.toLocaleLowerCase('id') === 'makanan') return 'is-food';
+  if (name.toLocaleLowerCase('id') === 'minuman') return 'is-drink';
+  if (name.toLocaleLowerCase('id') === 'dessert') return 'is-dessert';
+  return 'is-neutral';
 }
 function CategoryEditor({
   category: c,
   pending,
+  count,
   save,
 }: {
   category: Category;
   pending: boolean;
+  count: number;
   save: (body: unknown) => void;
 }) {
   return (
     <form
-      className="dash-inline-form"
+      className="dash-category-grid dash-category-row"
       action={(f) =>
         save({
           name: String(f.get('name')),
@@ -360,12 +460,7 @@ function CategoryEditor({
         })
       }
     >
-      <label>
-        Nama kategori
-        <input name="name" defaultValue={c.name} required maxLength={120} />
-      </label>
-      <label>
-        Urutan
+      <label className="dash-category-order">
         <input
           name="sortOrder"
           type="number"
@@ -373,11 +468,29 @@ function CategoryEditor({
           required
         />
       </label>
-      <label className="dash-check">
-        <input name="isActive" type="checkbox" defaultChecked={c.isActive} />
-        Aktif
+      <label className="dash-category-name">
+        <input
+          name="name"
+          defaultValue={c.name}
+          required
+          maxLength={120}
+          aria-label="Nama kategori"
+        />
       </label>
-      <button disabled={pending}>Simpan kategori</button>
+      <span className="dash-category-count">{count}</span>
+      <label className="dash-category-active">
+        <input
+          name="isActive"
+          type="checkbox"
+          role="switch"
+          defaultChecked={c.isActive}
+          aria-label={`Status kategori ${c.name}`}
+        />
+        <span>{c.isActive ? 'Aktif' : 'Nonaktif'}</span>
+      </label>
+      <button className="dash-category-save" disabled={pending}>
+        Simpan kategori
+      </button>
     </form>
   );
 }
@@ -391,18 +504,43 @@ const dayNames = [
   'Sabtu',
 ];
 const clock = (n: number) =>
-  `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`;
+  String(Math.floor(n / 60)).padStart(2, '0') +
+  ':' +
+  String(n % 60).padStart(2, '0');
 const minutes = (s: string) => {
   const [h, m] = s.split(':').map(Number);
   return h! * 60 + m!;
 };
+const slotClock = (value: string) =>
+  new Intl.DateTimeFormat('id-ID', {
+    timeZone: 'Asia/Jakarta',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  })
+    .format(new Date(value))
+    .replace(':', '.');
+const pickupDateLabel = (value: string) =>
+  new Intl.DateTimeFormat('id-ID', {
+    timeZone: 'Asia/Jakarta',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(value));
+
 export function PickupScreen() {
   const { tenant, membership } = useWorkspace();
   const owner = membership.role === 'OWNER';
   const client = useQueryClient();
   const [page, setPage] = useState(1),
     [date, setDate] = useState(''),
-    [notice, setNotice] = useState('');
+    [notice, setNotice] = useState(''),
+    [activeTab, setActiveTab] = useState<'slots' | 'hours'>('slots'),
+    [slotAvailability, setSlotAvailability] = useState<Record<string, boolean>>(
+      {},
+    ),
+    [hoursOpen, setHoursOpen] = useState<Record<string, boolean>>({});
   const q = useDashboardQuery<PickupResult>(
     'pickup',
     `pickup?${new URLSearchParams({ page: String(page), ...(date ? { date } : {}) })}`,
@@ -421,27 +559,53 @@ export function PickupScreen() {
       void q.refetch();
     },
   });
+  const displayedDateValue = date
+    ? date + 'T12:00:00+07:00'
+    : (q.data?.items[0]?.startsAt ?? new Date().toISOString());
+
   return (
-    <>
-      <PageHeading
-        title="Jadwal Pickup"
-        description="Satu unit kapasitas mewakili satu pesanan · WIB."
-        refresh={() => q.refetch()}
-      />
-      <p className="dash-section">
-        <a href="#operating-hours">Lihat dan kelola jam operasional</a>
-      </p>
-      <label className="dash-date-filter">
-        Tanggal pickup
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => {
-            setDate(e.target.value);
-            setPage(1);
-          }}
-        />
-      </label>
+    <div className="dash-pickup-page">
+      <header className="dash-heading dash-pickup-heading">
+        <div>
+          <h1>Jadwal Pickup</h1>
+          <p>Satu unit kapasitas mewakili satu pesanan · WIB.</p>
+        </div>
+        <button
+          className="dash-menu-icon-button"
+          aria-label="Muat ulang"
+          onClick={() => q.refetch()}
+        >
+          <RefreshCw size={18} aria-hidden="true" />
+        </button>
+      </header>
+      <div
+        className="dash-pickup-tabs"
+        role="tablist"
+        aria-label="Jadwal pickup"
+      >
+        <button
+          id="pickup-slots-tab"
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'slots'}
+          aria-controls="pickup-slots-panel"
+          className={activeTab === 'slots' ? 'is-active' : ''}
+          onClick={() => setActiveTab('slots')}
+        >
+          Slot pickup
+        </button>
+        <button
+          id="pickup-hours-tab"
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'hours'}
+          aria-controls="pickup-hours-panel"
+          className={activeTab === 'hours' ? 'is-active' : ''}
+          onClick={() => setActiveTab('hours')}
+        >
+          Jam operasional
+        </button>
+      </div>
       <QueryState
         pending={q.isPending}
         error={q.error}
@@ -457,94 +621,265 @@ export function PickupScreen() {
           {mutation.error.message}
         </p>
       )}
-      {q.data && (
-        <>
-          <p className="dash-notice">
-            Reservasi menunggu verifikasi tetap memakai kapasitas. Jadwal dan
-            kapasitas pilot adalah konfigurasi pengembangan.
-          </p>
-          <div className="dash-slot-list">
-            {q.data.items.map((s) => (
-              <article className="dash-slot-row" key={`${s.id}:${s.updatedAt}`}>
-                <div>
-                  <h2>{time(s.startsAt)}</h2>
-                  <p>
-                    Sampai {time(s.endsAt)} ·{' '}
-                    {s.isAvailable ? 'Dibuka' : 'Ditutup'}
-                  </p>
-                </div>
-                <dl>
-                  <dt>Maksimum</dt>
-                  <dd>{s.capacity}</dd>
-                  <dt>Terkonfirmasi</dt>
-                  <dd>{s.confirmed}</dd>
-                  <dt>Ditahan</dt>
-                  <dd>{s.held}</dd>
-                  <dt>Tersisa</dt>
-                  <dd>{s.remaining}</dd>
-                </dl>
-                {owner && (
-                  <form
-                    className="dash-inline-form"
-                    action={(f) =>
-                      mutation.mutate({
-                        path: `pickup/${s.id}`,
-                        body: {
-                          capacity: Number(f.get('capacity')),
-                          isAvailable: f.get('isAvailable') === 'on',
-                          updatedAt: s.updatedAt,
-                        },
-                      })
-                    }
-                  >
-                    <label>
-                      Kapasitas
-                      <input
-                        name="capacity"
-                        type="number"
-                        min={Math.max(1, s.confirmed + s.held)}
-                        max={1000}
-                        defaultValue={s.capacity}
-                        required
-                      />
-                    </label>
-                    <label className="dash-check">
-                      <input
-                        name="isAvailable"
-                        type="checkbox"
-                        defaultChecked={s.isAvailable}
-                      />
-                      Dibuka
-                    </label>
-                    <button disabled={mutation.isPending}>Simpan slot</button>
-                  </form>
-                )}
-              </article>
-            ))}
-            {!q.data.items.length && (
-              <p className="dash-empty">
-                Tidak ada slot pickup mendatang pada pilihan ini.
+
+      {q.data &&
+        (activeTab === 'slots' ? (
+          <section
+            id="pickup-slots-panel"
+            role="tabpanel"
+            aria-labelledby="pickup-slots-tab"
+            className="dash-pickup-panel"
+          >
+            <div className="dash-pickup-datebar">
+              <div className="dash-pickup-date-title">
+                <CalendarDays size={19} aria-hidden="true" />
+                <strong>{pickupDateLabel(displayedDateValue)}</strong>
+              </div>
+              <label className="dash-date-filter">
+                <span className="sr-only">Tanggal pickup</span>
+                <input
+                  type="date"
+                  aria-label="Tanggal pickup"
+                  value={date}
+                  onChange={(e) => {
+                    setDate(e.target.value);
+                    setPage(1);
+                  }}
+                />
+              </label>
+              <span className="dash-timezone-badge">WIB · Asia/Jakarta</span>
+            </div>
+            <div className="dash-pickup-callout">
+              <Info size={18} aria-hidden="true" />
+              <p>
+                Reservasi menunggu verifikasi tetap memakai kapasitas. Jadwal
+                dan kapasitas pilot adalah konfigurasi pengembangan.
               </p>
-            )}
-          </div>
-          <Pagination
-            page={page}
-            size={25}
-            total={q.data.total}
-            onPage={setPage}
-          />
-          <section className="dash-section">
-            <h2 id="operating-hours">Jam operasional</h2>
-            <p>
-              Zona waktu Asia/Jakarta. Perubahan hanya berlaku untuk waktu
-              mendatang dan diblokir jika mengganggu reservasi.
-            </p>
-            {q.data.hours.map((h) => (
-              <div key={`${h.id}:${h.updatedAt}`} className="dash-hours-row">
-                <h3>{dayNames[h.dayOfWeek]}</h3>
-                {owner ? (
+            </div>
+            <div className="dash-pickup-table-wrap">
+              <div
+                className="dash-pickup-grid dash-pickup-table-head"
+                aria-hidden="true"
+              >
+                <span>Slot</span>
+                <span>Kapasitas terpakai</span>
+                <span>Maksimum</span>
+                <span>Buka</span>
+                <span></span>
+              </div>
+              <div className="dash-pickup-slot-list">
+                {q.data.items.map((s) => {
+                  const available = slotAvailability[s.id] ?? s.isAvailable;
+                  const confirmedWidth =
+                    s.capacity > 0
+                      ? Math.min((s.confirmed / s.capacity) * 100, 100)
+                      : 0;
+                  const heldWidth =
+                    s.capacity > 0
+                      ? Math.min(
+                          (s.held / s.capacity) * 100,
+                          Math.max(0, 100 - confirmedWidth),
+                        )
+                      : 0;
+                  const details = (
+                    <>
+                      <div
+                        className={
+                          'dash-pickup-slot-title' +
+                          (available ? '' : ' is-muted')
+                        }
+                      >
+                        <strong>
+                          {slotClock(s.startsAt)} – {slotClock(s.endsAt)} WIB
+                        </strong>
+                        <span
+                          className={
+                            'dash-pickup-status' + (available ? ' is-open' : '')
+                          }
+                        >
+                          {available ? 'Dibuka' : 'Ditutup'}
+                        </span>
+                      </div>
+                      <div
+                        className={
+                          'dash-capacity' + (available ? '' : ' is-muted')
+                        }
+                      >
+                        <div
+                          className="dash-capacity-track"
+                          role="img"
+                          aria-label={
+                            s.confirmed +
+                            ' terkonfirmasi, ' +
+                            s.held +
+                            ' ditahan, tersisa ' +
+                            s.remaining +
+                            ' dari ' +
+                            s.capacity
+                          }
+                        >
+                          <span
+                            className="dash-capacity-confirmed"
+                            style={{ width: confirmedWidth + '%' }}
+                          />
+                          <span
+                            className="dash-capacity-held"
+                            style={{ width: heldWidth + '%' }}
+                          />
+                        </div>
+                        <div className="dash-capacity-legend">
+                          <span>
+                            Terkonfirmasi <strong>{s.confirmed}</strong>
+                          </span>
+                          <span>
+                            Ditahan <strong>{s.held}</strong>
+                          </span>
+                          <span className={s.remaining <= 2 ? 'is-low' : ''}>
+                            Tersisa <strong>{s.remaining}</strong>
+                          </span>
+                        </div>
+                      </div>
+                    </>
+                  );
+                  return (
+                    <article
+                      className="dash-pickup-slot"
+                      key={s.id + ':' + s.updatedAt}
+                    >
+                      {owner ? (
+                        <form
+                          className="dash-pickup-grid dash-pickup-slot-form"
+                          action={(f) =>
+                            mutation.mutate({
+                              path: 'pickup/' + s.id,
+                              body: {
+                                capacity: Number(f.get('capacity')),
+                                isAvailable: f.get('isAvailable') === 'on',
+                                updatedAt: s.updatedAt,
+                              },
+                            })
+                          }
+                        >
+                          {details}
+                          <label className="dash-pickup-capacity">
+                            <span className="sr-only">
+                              Maksimum kapasitas {slotClock(s.startsAt)}
+                            </span>
+                            <input
+                              name="capacity"
+                              type="number"
+                              min={Math.max(1, s.confirmed + s.held)}
+                              max={1000}
+                              defaultValue={s.capacity}
+                              required
+                            />
+                          </label>
+                          <label className="dash-pickup-switch">
+                            <input
+                              name="isAvailable"
+                              type="checkbox"
+                              role="switch"
+                              aria-checked={available}
+                              aria-label={
+                                'Buka slot ' +
+                                slotClock(s.startsAt) +
+                                ' – ' +
+                                slotClock(s.endsAt)
+                              }
+                              defaultChecked={s.isAvailable}
+                              onChange={(event) => {
+                                const checked = event.currentTarget.checked;
+                                setSlotAvailability((current) => ({
+                                  ...current,
+                                  [s.id]: checked,
+                                }));
+                              }}
+                            />
+                            <span
+                              className="dash-switch-visual"
+                              aria-hidden="true"
+                            />
+                          </label>
+                          <button
+                            className="dash-pickup-save"
+                            disabled={mutation.isPending}
+                          >
+                            Simpan
+                          </button>
+                        </form>
+                      ) : (
+                        <div className="dash-pickup-grid dash-pickup-slot-form">
+                          {details}
+                          <strong className="dash-pickup-capacity-readonly">
+                            {s.capacity}
+                          </strong>
+                          <span
+                            className={
+                              'dash-pickup-status-text' +
+                              (available ? ' is-open' : '')
+                            }
+                          >
+                            {available ? 'Buka' : 'Tutup'}
+                          </span>
+                          <span />
+                        </div>
+                      )}
+                    </article>
+                  );
+                })}
+                {!q.data.items.length && (
+                  <p className="dash-empty">
+                    Tidak ada slot pickup mendatang pada pilihan ini.
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="dash-pickup-results">
+              <span>{q.data.total} slot ditampilkan</span>
+              {q.data.total > 25 && (
+                <Pagination
+                  page={page}
+                  size={25}
+                  total={q.data.total}
+                  onPage={setPage}
+                />
+              )}
+            </div>
+          </section>
+        ) : (
+          <section
+            id="pickup-hours-panel"
+            role="tabpanel"
+            aria-labelledby="pickup-hours-tab"
+            className="dash-pickup-panel"
+          >
+            <div className="dash-pickup-callout">
+              <Info size={18} aria-hidden="true" />
+              <p>
+                Zona waktu Asia/Jakarta. Perubahan hanya berlaku untuk waktu
+                mendatang dan diblokir jika mengganggu reservasi.
+              </p>
+            </div>
+            <div className="dash-hours-table-wrap">
+              <div
+                className="dash-hours-grid dash-hours-table-head"
+                aria-hidden="true"
+              >
+                <span>Hari</span>
+                <span>Buka</span>
+                <span>Tutup</span>
+                <span>Status</span>
+                <span></span>
+              </div>
+              {q.data.hours.map((h) => {
+                const isOpen = hoursOpen[h.id] ?? !h.isClosed;
+                return owner ? (
                   <form
-                    className="dash-inline-form"
+                    key={h.id + ':' + h.updatedAt}
+                    className={
+                      'dash-hours-grid dash-hours-row' +
+                      (isOpen ? '' : ' is-closed')
+                    }
                     action={(f) =>
                       mutation.mutate({
                         path: 'operating-hours',
@@ -561,55 +896,102 @@ export function PickupScreen() {
                       })
                     }
                   >
-                    <label>
-                      Buka
+                    <strong className="dash-hours-day">
+                      {dayNames[h.dayOfWeek]}
+                    </strong>
+                    <label className="dash-hours-time">
+                      <span className="sr-only">
+                        Buka {dayNames[h.dayOfWeek]}
+                      </span>
                       <input
                         name="opensAt"
                         type="time"
                         defaultValue={clock(h.opensAt)}
                         required
+                        aria-disabled={!isOpen}
                       />
                     </label>
-                    <label>
-                      Tutup (HH:mm)
+                    <label className="dash-hours-time">
+                      <span className="sr-only">
+                        Tutup {dayNames[h.dayOfWeek]}
+                      </span>
                       <input
                         name="closesAt"
                         pattern="(?:[01][0-9]|2[0-3]):[0-5][0-9]|24:00"
                         defaultValue={clock(h.closesAt)}
                         required
+                        aria-disabled={!isOpen}
                       />
                     </label>
-                    <label className="dash-check">
+                    <label className="dash-hours-switch">
                       <input
                         name="isClosed"
                         type="checkbox"
+                        role="switch"
+                        aria-checked={isOpen}
+                        aria-label={'Buka ' + dayNames[h.dayOfWeek]}
                         defaultChecked={h.isClosed}
+                        onChange={(event) => {
+                          const checked = event.currentTarget.checked;
+                          setHoursOpen((current) => ({
+                            ...current,
+                            [h.id]: !checked,
+                          }));
+                        }}
                       />
-                      Tutup
+                      <span className="dash-switch-visual" aria-hidden="true" />
+                      <span className={isOpen ? 'is-open' : ''}>
+                        {isOpen ? 'Buka' : 'Tutup'}
+                      </span>
                     </label>
-                    <button disabled={mutation.isPending}>Simpan jam</button>
+                    <button
+                      className="dash-hours-save"
+                      disabled={mutation.isPending}
+                    >
+                      Simpan jam
+                    </button>
                   </form>
                 ) : (
-                  <p>
-                    {h.isClosed
-                      ? 'Tutup'
-                      : `${clock(h.opensAt)}–${clock(h.closesAt)} WIB`}
-                  </p>
-                )}
-              </div>
-            ))}
-            {!q.data.hours.length && (
-              <p className="dash-empty">
-                Belum ada jam operasional. Minta pengelola menyiapkan jadwal
-                tenant.
-              </p>
-            )}
+                  <div
+                    key={h.id + ':' + h.updatedAt}
+                    className={
+                      'dash-hours-grid dash-hours-row' +
+                      (isOpen ? '' : ' is-closed')
+                    }
+                  >
+                    <strong className="dash-hours-day">
+                      {dayNames[h.dayOfWeek]}
+                    </strong>
+                    <span className="dash-hours-time-readonly">
+                      {clock(h.opensAt)}
+                    </span>
+                    <span className="dash-hours-time-readonly">
+                      {h.closesAt === 1440 ? '24:00' : clock(h.closesAt)}
+                    </span>
+                    <span
+                      className={
+                        'dash-hours-switch-text' + (isOpen ? ' is-open' : '')
+                      }
+                    >
+                      {isOpen ? 'Buka' : 'Tutup'}
+                    </span>
+                    <span />
+                  </div>
+                );
+              })}
+              {!q.data.hours.length && (
+                <p className="dash-empty">
+                  Belum ada jam operasional. Minta pengelola menyiapkan jadwal
+                  tenant.
+                </p>
+              )}
+            </div>
           </section>
-        </>
-      )}
-    </>
+        ))}
+    </div>
   );
 }
+
 export function SettingsScreen() {
   const { tenant, membership } = useWorkspace();
   const client = useQueryClient();
