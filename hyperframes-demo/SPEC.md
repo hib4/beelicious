@@ -80,7 +80,7 @@ TIME: 57.67 s × 60 = 3460 frames. Music: "Digital Clouds" at 129 BPM, so 1 beat
 
 | Scene | Time | What happens |
 |---|---|---|
-| hook | 0–3.72 | Yellow. LAPAR?; the bee flies in; "Halo" is typed into an ink bubble, which grows into the charcoal world. |
+| hook | 0–3.72 | Beat cuts: "Jam 12." (yellow, b0) → "Antre?" (charcoal, b1) → LAPAR? slams letter by letter (yellow, b2). The bee flies in (b3); a big "Halo" is typed into an ink bubble, sent on b5, which grows into the charcoal world. |
 | chat | 3.72–17.67 | Five real exchanges: tenant (1), category (1), menu (2), quantity (2), cart (3). It ends with an iris from the 3. |
 | pickup | 17.67–24.19 | Parchment. The slot list; 1 picks "12.30", which grows; the confirm card; 1 = Konfirmasi & Bayar. |
 | bayar | 24.19–37.21 | Yellow. Order created; Rp60.000 slams (the one riser→impact); the QRIS instruction with the card; the verified message with its honesty line held ≥ 2 s. The order collapses to a slab. |

@@ -56,6 +56,7 @@
         tl.to("#am-cur", { scale: 1, duration: 0.2, ease: "power2.out" }, t + 0.1);
       };
       gsap.set("#am-drop", { y: -1080 });
+      gsap.set("#am-ui", { y: 700 }); // off-screen until it slides in, so it appears once
       gsap.set(["#am-ch1", "#am-n1"], { opacity: 0 });
       gsap.set("#am-cur", at(2050, 1150));
       // 12.30: the student arrives; the merchant closes the order
