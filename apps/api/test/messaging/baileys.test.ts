@@ -1,4 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
+import type { MessagingConfig } from '../../src/config.js';
 import { createBaileysAdapter } from '../../src/modules/messaging/providers/baileys/index.js';
 import {
   ACCOUNT,
@@ -18,13 +19,13 @@ afterEach(async () => {
   await Promise.all(adapters.splice(0).map((a) => a.stop()));
   vi.useRealTimers();
 });
-function setup() {
+function setup(config: MessagingConfig = messagingConfig) {
   const f = socketFixture();
   const auth = authFixture();
   const callbacks = callbacksFixture();
   const qr = vi.fn();
   const factory = factoryFor(f);
-  const adapter = createBaileysAdapter(messagingConfig, callbacks, {
+  const adapter = createBaileysAdapter(config, callbacks, {
     socketFactory: factory,
     openAuth: async () => auth,
     qr,
@@ -103,6 +104,55 @@ it('processes multiple fresh messages, approves alternate LIDs, and ignores hist
   });
   await flush();
   expect(f.callbacks.receive).toHaveBeenCalledOnce();
+});
+it('demo mode accepts and approves any direct contact but still ignores groups/outgoing', async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(NOW);
+  const f = setup({ ...messagingConfig, allowAllContacts: true });
+  await connect(f);
+  f.socket.signalRepository.lidMapping.getPNForLID.mockResolvedValue(undefined);
+  const stranger = '15555550199@s.whatsapp.net';
+  f.emit('messages.upsert', {
+    type: 'notify',
+    messages: [
+      rawMessage({
+        key: { id: 'stranger', remoteJid: stranger, fromMe: false },
+      }),
+      rawMessage({
+        key: { id: 'opaque', remoteJid: '123@lid', fromMe: false },
+      }),
+      rawMessage({ key: { id: 'out', remoteJid: stranger, fromMe: true } }),
+      rawMessage({ key: { id: 'group', remoteJid: '1@g.us', fromMe: false } }),
+    ],
+  });
+  await flush();
+  expect(f.callbacks.receive).toHaveBeenCalledOnce();
+  expect(
+    f.callbacks.receive.mock.calls[0]![0].map(
+      (message: { chatId: string }) => message.chatId,
+    ),
+  ).toEqual([stranger, '123@lid']);
+  expect(await f.adapter.approved(stranger)).toBe(true);
+  expect(await f.adapter.approved('123@lid')).toBe(true);
+  expect(await f.adapter.approved('1@g.us')).toBe(false);
+});
+it('without demo mode an unlisted contact is neither stored nor approved', async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(NOW);
+  const f = setup();
+  await connect(f);
+  const stranger = '15555550199@s.whatsapp.net';
+  f.emit('messages.upsert', {
+    type: 'notify',
+    messages: [
+      rawMessage({
+        key: { id: 'stranger', remoteJid: stranger, fromMe: false },
+      }),
+    ],
+  });
+  await flush();
+  expect(f.callbacks.receive).not.toHaveBeenCalled();
+  expect(await f.adapter.approved(stranger)).toBe(false);
 });
 it('bounds reconnects, removes old listeners, and does not create simultaneous sockets', async () => {
   vi.useFakeTimers();

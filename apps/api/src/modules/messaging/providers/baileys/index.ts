@@ -46,6 +46,10 @@ export function createBaileysAdapter(
 ): MessagingAdapter {
   const now = dependencies.now ?? Date.now;
   const cutoff = now();
+  // Demo mode answers any direct contact who writes first; otherwise only listed phones.
+  const allowed = (phone: string | undefined) =>
+    config.allowAllContacts === true ||
+    (!!phone && config.testRecipients.includes(phone));
   let socket: WASocket | undefined;
   let auth: LocalAuth | undefined;
   let scope: string | undefined;
@@ -214,11 +218,7 @@ export function createBaileysAdapter(
             }
             if (!valid()) return;
             // Unknown/unapproved contacts need no persistent private record.
-            if (
-              message.senderPhone &&
-              config.testRecipients.includes(message.senderPhone)
-            )
-              messages.push(message);
+            if (allowed(message.senderPhone)) messages.push(message);
           }
           if (valid() && messages.length) await callbacks.receive(messages);
         })(),
@@ -298,7 +298,7 @@ export function createBaileysAdapter(
             undefined,
         );
       // A phone alias authenticated in the inbound envelope remains valid across restart.
-      return config.testRecipients.includes(phone ?? senderPhone ?? '');
+      return allowed(phone ?? senderPhone);
     },
     async sendImage(message, signal): Promise<SendResult> {
       validateImage(message);

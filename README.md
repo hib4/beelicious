@@ -92,6 +92,8 @@ BAILEYS_ALLOWED_TEST_CONTACTS=APPROVED_TEST_NUMBER
 
 Replace `APPROVED_TEST_NUMBER` with an international number containing digits only; separate multiple contacts with commas. Start the API, scan the terminal QR through WhatsApp **Linked Devices**, then send **Halo** from an approved separate WhatsApp account. Messages sent by the connected account are ignored.
 
+For a live demo, `BAILEYS_ALLOW_ALL_CONTACTS=true` makes the bot reply to **anyone** who messages it first, with no allowlist needed (Baileys and `NODE_ENV=development` only; the worker prints a warning at startup). It never starts conversations and still ignores groups and messages sent before the worker started. Baileys is unofficial and replying to many unknown numbers raises the risk of WhatsApp restricting the linked account, so use a dedicated number and set it back to `false` afterwards.
+
 Authentication persists in the ignored `.local/baileys-auth` directory, so valid sessions reconnect after restart without another scan. Never commit or share authentication files.
 
 | Provider    | Configuration                                                                                                |

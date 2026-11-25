@@ -37,6 +37,7 @@ const flagsSchema = z.object({
   WHATSAPP_ENABLED: flag,
   CONVERSATION_ENABLED: flag,
   WHATSAPP_TEST_BOT_ENABLED: flag,
+  BAILEYS_ALLOW_ALL_CONTACTS: flag,
 });
 const whatsappSchema = z.object({
   WHATSAPP_ACCESS_TOKEN: z.string().trim().min(1),
@@ -70,6 +71,8 @@ export interface MessagingConfig {
   provider: MessagingProvider;
   testBotEnabled: boolean;
   testRecipients: string[];
+  /** Development-only Baileys demo mode: reply to any direct contact who writes first. */
+  allowAllContacts?: boolean;
   authDir?: string;
 }
 const contactsSchema = z
@@ -143,6 +146,8 @@ export function parseEnvironment(
   if (!flags.data.WHATSAPP_ENABLED) {
     if (flags.data.WHATSAPP_TEST_BOT_ENABLED)
       invalid(['WHATSAPP_TEST_BOT_ENABLED']);
+    if (flags.data.BAILEYS_ALLOW_ALL_CONTACTS)
+      invalid(['BAILEYS_ALLOW_ALL_CONTACTS', 'WHATSAPP_ENABLED']);
     return {
       ...result.data,
       ...(dashboard
@@ -152,6 +157,9 @@ export function parseEnvironment(
     };
   }
   const provider = flags.data.MESSAGING_PROVIDER;
+  const allowAllContacts = flags.data.BAILEYS_ALLOW_ALL_CONTACTS;
+  if (allowAllContacts && provider !== 'baileys')
+    invalid(['BAILEYS_ALLOW_ALL_CONTACTS', 'MESSAGING_PROVIDER']);
   if (provider !== 'cloud-api') {
     const contactsField =
       provider === 'baileys'
@@ -163,7 +171,8 @@ export function parseEnvironment(
       invalid(['NODE_ENV', 'MESSAGING_PROVIDER']);
     if (
       flags.data.WHATSAPP_TEST_BOT_ENABLED &&
-      (result.data.NODE_ENV !== 'development' || contacts.data.length === 0)
+      (result.data.NODE_ENV !== 'development' ||
+        (contacts.data.length === 0 && !allowAllContacts))
     )
       invalid(['WHATSAPP_TEST_BOT_ENABLED', 'NODE_ENV', contactsField]);
     const authDir = environment.BAILEYS_AUTH_DIR ?? './.local/baileys-auth';
@@ -181,7 +190,7 @@ export function parseEnvironment(
         provider,
         testBotEnabled: flags.data.WHATSAPP_TEST_BOT_ENABLED,
         testRecipients: contacts.data,
-        ...(provider === 'baileys' ? { authDir } : {}),
+        ...(provider === 'baileys' ? { authDir, allowAllContacts } : {}),
       },
     };
   }
@@ -233,6 +242,7 @@ export function parseHttpEnvironment(
     'WHATSAPP_TEST_BOT_ENABLED',
     'CONVERSATION_ENABLED',
     'CHECKOUT_ENABLED',
+    'BAILEYS_ALLOW_ALL_CONTACTS',
   ].filter(
     (field) =>
       environment[field] !== undefined && environment[field] !== 'false',

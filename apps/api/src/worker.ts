@@ -56,6 +56,10 @@ async function main() {
   try {
     await runtime.start();
     console.info('Local messaging and background worker started');
+    if (config.messaging?.allowAllContacts)
+      console.warn(
+        'BAILEYS_ALLOW_ALL_CONTACTS is on: replying to any direct contact who writes first (development demo only).',
+      );
   } catch {
     console.error('Local worker startup failed');
     await shutdown(1);

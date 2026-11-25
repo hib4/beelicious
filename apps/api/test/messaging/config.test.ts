@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { parseEnvironment } from '../../src/config.js';
+import { parseEnvironment, parseHttpEnvironment } from '../../src/config.js';
 import { ENV } from '../whatsapp/fixtures.js';
 import { PHONE } from './fixtures.js';
 
@@ -76,4 +76,57 @@ it('ignores inactive credential/allowlist values', () => {
       META_GRAPH_API_VERSION: 'invalid',
     }).whatsapp,
   ).toBeUndefined();
+});
+it('allows a Baileys development demo to answer any contact without an allowlist', () => {
+  const messaging = parseEnvironment({
+    ...base,
+    MESSAGING_PROVIDER: 'baileys',
+    BAILEYS_ALLOW_ALL_CONTACTS: 'true',
+  }).messaging;
+  expect(messaging?.allowAllContacts).toBe(true);
+  expect(messaging?.testRecipients).toEqual([]);
+  expect(
+    parseEnvironment({
+      ...base,
+      MESSAGING_PROVIDER: 'baileys',
+      BAILEYS_ALLOWED_TEST_CONTACTS: PHONE,
+    }).messaging?.allowAllContacts,
+  ).toBe(false);
+});
+it.each(['TRUE', '1', 'yes'])(
+  'requires literal true to answer any contact, received %s',
+  (value) => {
+    expect(() =>
+      parseEnvironment({
+        ...base,
+        MESSAGING_PROVIDER: 'baileys',
+        BAILEYS_ALLOW_ALL_CONTACTS: value,
+      }),
+    ).toThrow('Invalid environment configuration:');
+  },
+);
+it.each([
+  { MESSAGING_PROVIDER: 'mock', WHATSAPP_TEST_RECIPIENTS: PHONE },
+  { MESSAGING_PROVIDER: 'cloud-api' },
+  { MESSAGING_PROVIDER: 'baileys', NODE_ENV: 'production' },
+  { WHATSAPP_ENABLED: 'false', WHATSAPP_TEST_BOT_ENABLED: 'false' },
+])(
+  'rejects answering any contact outside a Baileys development demo',
+  (override) => {
+    expect(() =>
+      parseEnvironment({
+        ...base,
+        BAILEYS_ALLOW_ALL_CONTACTS: 'true',
+        ...override,
+      }),
+    ).toThrow('Invalid environment configuration:');
+  },
+);
+it('rejects the demo flag on the hosted HTTP runtime', () => {
+  expect(() =>
+    parseHttpEnvironment({
+      DATABASE_URL: ENV.DATABASE_URL,
+      BAILEYS_ALLOW_ALL_CONTACTS: 'true',
+    }),
+  ).toThrow('BAILEYS_ALLOW_ALL_CONTACTS');
 });
