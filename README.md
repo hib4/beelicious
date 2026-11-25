@@ -137,7 +137,7 @@ Copy the reference from inspection output. Simulation controls are development-o
 
 ## Catalog and pickup
 
-The idempotent development seed creates **Warung Babe**, categories **Makanan** / **Minuman**, and two prototype items: **Nasi Goreng Spesial — Rp20,000** and **Es Teh Manis — Rp5,000**. Example operating hours are daily **07.00–18.00 WIB**. These are unverified development fixtures, not a production merchant catalog or schedule; repeated seeds preserve existing edits.
+The idempotent development seed creates **Bakmi Effata**, categories **Bakmi** / **Minuman** / **Tambahan**, and ten illustrative prototype items: Bakmi Ayam Rp25,000, Bakmi Ayam Pangsit Rp30,000, Bakmi Ayam Jamur Rp28,000, Kwetiau Goreng Ayam Rp28,000, Es Teh Manis Rp5,000, Es Jeruk Rp8,000, Teh Tawar Hangat Rp3,000, Pangsit Goreng Rp10,000, Bakso Ayam Rp8,000 and Ekstra Ayam Rp7,000. The earlier Warung Babe fixture is kept inactive on databases that already contain it. Example operating hours are daily **07.00–18.00 WIB**. These are unverified development fixtures, not a production merchant catalog or schedule; repeated seeds preserve existing edits.
 
 Defaults in `.env.example`: 20 units per cart item, 30-minute pickup slots, five orders per slot, 60-minute lead time, seven-day booking window, and 15-minute requested payment expiry. Times display in `Asia/Jakarta`; timestamps persist in UTC. Prices and totals use integer Rupiah.
 

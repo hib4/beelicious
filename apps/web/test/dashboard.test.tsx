@@ -25,7 +25,7 @@ it('uses historical item snapshots and separate payment/fulfillment labels', () 
   const order = {
     id: 'order-id',
     orderNumber: 'BEE-TEST',
-    tenantName: 'Warung Babe',
+    tenantName: 'Bakmi Effata',
     placedAt: '2026-10-21T02:00:00Z',
     pickupSlot: { startsAt: '2026-10-21T04:00:00Z' },
     payment: { status: 'SUCCEEDED', provider: 'mock' },

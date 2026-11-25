@@ -1,6 +1,6 @@
 # Editorial photography provenance
 
-These photographs illustrate Indonesian food culture, not Warung Babe dishes or merchant availability. No people or brands are used as endorsements. The original Bee-bot remains unchanged.
+These photographs illustrate Indonesian food culture, not Bakmi Effata dishes or merchant availability. No people or brands are used as endorsements. The original Bee-bot remains unchanged.
 
 ## Delicious Indonesian Fried Rice with Egg
 

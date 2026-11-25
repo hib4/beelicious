@@ -246,9 +246,9 @@
         tl.to("#cur", { scale: 0.9, transformOrigin: "21% 12%", duration: 0.1, ease: "power2.in" }, t);
         tl.to("#cur", { scale: 1, duration: 0.2, ease: "power2.out" }, t + 0.1);
       };
-      const swap = (from, to, t) => {
+      const swap = (from, to, t, pop = 1.25) => {
         tl.set(from, { opacity: 0 }, t);
-        tl.fromTo(to, { opacity: 0, scale: 1.25, transformOrigin: "0% 50%" }, { opacity: 1, scale: 1, duration: 0.22, ease: "back.out(2.5)", immediateRender: false }, t);
+        tl.fromTo(to, { opacity: 0, scale: pop, transformOrigin: "0% 50%" }, { opacity: 1, scale: 1, duration: 0.22, ease: "back.out(2.5)", immediateRender: false }, t);
       };
 
       gsap.set("#cam", { scale: 1, x: 0, y: 0 });
@@ -277,35 +277,46 @@
       tl.fromTo("#split", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ease: "power3.out", immediateRender: false }, Z + 0.26);
       tl.to("#ph", { x: 0, duration: 0.35, ease: "power3.out" }, Z + 0.26);
 
-      // three confirmed steps; each sends the customer a notification, processed separately
       const BTN = at(72 + 2.4 * 80, 58 + 2.4 * 207);
       const OK = at(72 + 2.4 * 372, 58 + 2.4 * 225); // Konfirmasi measured at (973, 596) on screen
-      const steps = [
-        { t: 9 * B, chip: ["#ch0", "#ch1"], next: ["#nx0", "#nx1"], btn: ["#bt0", "#bt1"], title: "#dt0", nb: "nb1" },
-        { t: 12 * B, chip: ["#ch1", "#ch2"], next: ["#nx1", "#nx2"], btn: ["#bt1", "#bt2"], title: "#dt1", nb: "nb2" },
-        { t: 15 * B, chip: ["#ch2", "#ch3"], next: ["#nx2", "#nx3"], btn: ["#bt2", "#bt3"], title: "#dt2", nb: "nb3" },
-      ];
-      steps.forEach((st, i) => {
-        const glide = i === 0 ? 0.4 : 0.3;
-        tl.to("#cur", { ...BTN, duration: glide, ease: "power3.out" }, st.t - glide - 0.02);
-        press(st.t);
-        // the confirm dialog
-        tl.set(["#dt0", "#dt1", "#dt2"], { opacity: 0 }, st.t + 0.1);
-        tl.set(st.title, { opacity: 1 }, st.t + 0.1);
-        tl.fromTo("#back", { opacity: 0 }, { opacity: 1, duration: 0.12, ease: "none", immediateRender: false }, st.t + 0.1);
-        tl.fromTo("#dlg", { opacity: 0, scale: 0.94, transformOrigin: "50% 50%" }, { opacity: 1, scale: 1, duration: 0.15, ease: "power3.out", immediateRender: false }, st.t + 0.1);
-        tl.to("#cur", { ...OK, duration: 0.28, ease: "power3.out" }, st.t + (i === 0 ? 0.44 : 0.2));
-        const c = st.t + (i === 0 ? 0.8 : 0.56);
-        press(c);
-        tl.to(["#dlg", "#back"], { opacity: 0, duration: 0.08, ease: "power3.in" }, c + 0.1);
-        swap(st.chip[0], st.chip[1], c + 0.14);
-        tl.set(st.next[0], { opacity: 0 }, c + 0.14);
-        tl.set(st.next[1], { opacity: 1 }, c + 0.14);
-        tl.set(st.btn[0], { opacity: 0 }, c + 0.14);
-        tl.set(st.btn[1], { opacity: 1 }, c + 0.14);
-        if (i === 0) tl.fromTo("#notice", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.15, ease: "power4.out", immediateRender: false }, c + 0.2);
-        botSays(st.nb, c + 0.5);
-      });
+      // after the first confirm the dashboard stays pushed in (top-left anchored) so the status chips read bigger
+      const Zs = 1.35;
+      const BTNZ = at(72 + Zs * 2.4 * 80, 58 + Zs * 2.4 * 207);
+      const advance = (st, t, pop) => {
+        swap(st.chip[0], st.chip[1], t, pop);
+        tl.set(st.next[0], { opacity: 0 }, t);
+        tl.set(st.next[1], { opacity: 1 }, t);
+        tl.set(st.btn[0], { opacity: 0 }, t);
+        tl.set(st.btn[1], { opacity: 1 }, t);
+      };
+
+      // step 1, shown in full: Terima pesanan → confirm dialog → Konfirmasi
+      const t1 = 9 * B;
+      tl.to("#cur", { ...BTN, duration: 0.4, ease: "power3.out" }, t1 - 0.42);
+      press(t1);
+      tl.set("#dt0", { opacity: 1 }, t1 + 0.1);
+      tl.fromTo("#back", { opacity: 0 }, { opacity: 1, duration: 0.12, ease: "none", immediateRender: false }, t1 + 0.1);
+      tl.fromTo("#dlg", { opacity: 0, scale: 0.94, transformOrigin: "50% 50%" }, { opacity: 1, scale: 1, duration: 0.15, ease: "power3.out", immediateRender: false }, t1 + 0.1);
+      tl.to("#cur", { ...OK, duration: 0.28, ease: "power3.out" }, t1 + 0.44);
+      const c1 = t1 + 0.8;
+      press(c1);
+      tl.to(["#dlg", "#back"], { opacity: 0, duration: 0.08, ease: "power3.in" }, c1 + 0.1);
+      advance({ chip: ["#ch0", "#ch1"], next: ["#nx0", "#nx1"], btn: ["#bt0", "#bt1"] }, c1 + 0.14, 1.8);
+      // the camera punches in on the new status
+      tl.to("#stk", { scale: Zs, transformOrigin: "0px 0px", duration: 0.3, ease: "power2.out" }, c1 + 0.14);
+      tl.fromTo("#notice", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.15, ease: "power4.out", immediateRender: false }, c1 + 0.2);
+      botSays("nb1", c1 + 0.5);
+
+      // steps 2 and 3: the merchant already knows the dialog, so one click on the action, then time to read
+      const step = (st, p) => {
+        tl.to("#cur", { ...BTNZ, duration: 0.4, ease: "power3.out" }, p - 0.42);
+        press(p);
+        advance(st, p + 0.14, 1.8);
+        tl.to("#cur", { x: "+=150", y: "+=110", duration: 0.35, ease: "power2.out" }, p + 0.3);
+        botSays(st.nb, p + 0.6);
+      };
+      step({ chip: ["#ch1", "#ch2"], next: ["#nx1", "#nx2"], btn: ["#bt1", "#bt2"], nb: "nb2" }, 12 * B + 0.2);
+      step({ chip: ["#ch2", "#ch3"], next: ["#nx2", "#nx3"], btn: ["#bt2", "#bt3"], nb: "nb3" }, 15 * B + 0.2);
 
       // the cursor leaves; the customer's chat takes the frame
       tl.to("#cur", { x: 1300, y: 1250, duration: 0.3, ease: "power2.in" }, 17.6 * B);

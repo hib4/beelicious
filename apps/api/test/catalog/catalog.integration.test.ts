@@ -321,11 +321,11 @@ it('associates only explicitly verified identities and never transfers ownership
   });
 });
 it('seeds exactly the supplied prototype catalog repeatedly and concurrently, preserving edits', async () => {
-  const reservedId = '3b000000-0000-4000-8000-000000000001';
+  const reservedId = '3e000000-0000-4000-8000-000000000001';
   // Refuse to take ownership of data from an earlier/manual run.
   expect(
     await client.tenant.findFirst({
-      where: { OR: [{ id: reservedId }, { slug: 'warung-babe' }] },
+      where: { OR: [{ id: reservedId }, { slug: 'bakmi-effata' }] },
     }),
   ).toBeNull();
   tenantIds.add(reservedId);
@@ -334,33 +334,42 @@ it('seeds exactly the supplied prototype catalog repeatedly and concurrently, pr
     seedDevelopmentCatalog(client),
   ]);
   await seedDevelopmentCatalog(client);
-  const t = await tenants.getBySlug('warung-babe');
+  const t = await tenants.getBySlug('bakmi-effata');
   expect(t).toMatchObject({
-    name: 'Warung Babe',
-    description: 'Indonesian food tenant for the Beelicious pilot.',
+    name: 'Bakmi Effata',
+    description: 'Tenant bakmi untuk pilot Beelicious.',
   });
   expect((await categories.list(t.id)).map((c) => c.name)).toEqual([
-    'Makanan',
+    'Bakmi',
     'Minuman',
+    'Tambahan',
   ]);
   const items = await menu.list(t.id);
   expect(items.map((i) => [i.name, i.price])).toEqual([
-    ['Nasi Goreng Spesial', 20000],
+    ['Bakmi Ayam', 25000],
+    ['Bakmi Ayam Pangsit', 30000],
+    ['Bakmi Ayam Jamur', 28000],
+    ['Kwetiau Goreng Ayam', 28000],
     ['Es Teh Manis', 5000],
+    ['Es Jeruk', 8000],
+    ['Teh Tawar Hangat', 3000],
+    ['Pangsit Goreng', 10000],
+    ['Bakso Ayam', 8000],
+    ['Ekstra Ayam', 7000],
   ]);
   await menu.setPrice(t.id, items[0]!.id, 21000);
   await seedDevelopmentCatalog(client);
   expect((await menu.get(t.id, items[0]!.id)).price).toBe(21000);
 });
 it('rolls back the entire seed when a reserved category belongs to another tenant', async () => {
-  const reservedTenant = '3b000000-0000-4000-8000-000000000001';
+  const reservedTenant = '3e000000-0000-4000-8000-000000000001';
   expect(
     await client.tenant.findUnique({ where: { id: reservedTenant } }),
   ).toBeNull();
   const owner = await tenant();
   await client.menuCategory.create({
     data: {
-      id: '3b000000-0000-4000-8000-000000000002',
+      id: '3e000000-0000-4000-8000-000000000002',
       tenantId: owner.id,
       name: 'Owned fixture',
     },

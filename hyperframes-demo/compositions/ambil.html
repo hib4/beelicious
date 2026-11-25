@@ -61,7 +61,7 @@
       gsap.set("#am-cur", at(2050, 1150));
       // 12.30: the student arrives; the merchant closes the order
       tl.fromTo("#am-ui", { y: 700 }, { y: 0, duration: 0.45, ease: "power3.out", immediateRender: false }, 0.1);
-      // one click on the action (its confirm dialog was already shown three times in dapur)
+      // one click on the action (its confirm dialog was already shown once in dapur)
       tl.to("#am-cur", { ...at(930 + 2.4 * 96, 450 + 2.4 * 194), duration: 0.4, ease: "power3.out" }, 3 * B - 0.42);
       const C = 3 * B;
       press(C);

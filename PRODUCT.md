@@ -24,7 +24,7 @@ Use DESIGN.md, the supplied beelicious.png unchanged, Indonesian copy, accessibl
 
 ## Evidence on hand
 
-Warung Babe is the supplied pilot example. Menu entries and operating hours are development fixtures, not verified commercial information. No authentic merchant photography, finalized wordmark, public contact, or production site origin has been supplied.
+Bakmi Effata is the supplied pilot example. Menu entries and operating hours are development fixtures, not verified commercial information. No authentic merchant photography, finalized wordmark, public contact, or production site origin has been supplied.
 
 ## Product principles
 

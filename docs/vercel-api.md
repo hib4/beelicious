@@ -33,10 +33,10 @@ Configure the ignored root `.env` with the hosted worker `DATABASE_URL`, migrati
 npm ci
 npm run db:migrate
 npm run db:seed
-npm run tenant:member -- AUTH_USER_UUID 3b000000-0000-4000-8000-000000000001 OWNER active readonly
+npm run tenant:member -- AUTH_USER_UUID 3e000000-0000-4000-8000-000000000001 OWNER active readonly
 ```
 
-The UUID shown is the reserved Warung Babe development seed tenant. The Auth UUID must be an existing provisioned user in this Supabase project. Seeding is development-only, idempotent, preserves existing edits, and uses prototype menu data and unverified daily operating hours. Never enable automatic seeding on deployment. Migration commands use DIRECT_DATABASE_URL when supplied; application/seed/membership commands use DATABASE_URL.
+The UUID shown is the reserved Bakmi Effata development seed tenant. The Auth UUID must be an existing provisioned user in this Supabase project. Seeding is development-only, idempotent, preserves existing edits, and uses prototype menu data and unverified daily operating hours. Never enable automatic seeding on deployment. Migration commands use DIRECT_DATABASE_URL when supplied; application/seed/membership commands use DATABASE_URL.
 
 Keep integration tests on a separate PostgreSQL database ending in `_test`. Set WHATSAPP_TEST_DATABASE_URL explicitly when the development URL points to Supabase. Never point tests at the pilot database. `db:migrate:test` overrides both connection variables with its guarded test target.
 

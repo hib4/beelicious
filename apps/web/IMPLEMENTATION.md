@@ -21,7 +21,7 @@ The direction draw selected Loud and Flat, seed 1438792661, while keeping the br
 - A brief yellow CHAT. PILIH. PICK UP. strip changes the pacing.
 - An asymmetric food editorial uses three licensed photographs, with explicit editorial labeling and visible credits.
 - Six conversation chapters show greeting, tenant selection, menu/quantity, cart, pickup, and payment instructions using numeric text interactions.
-- Warung Babe receives a large typographic pilot spotlight without fabricated photos or operating claims.
+- Bakmi Effata receives a large typographic pilot spotlight without fabricated photos or operating claims.
 - The Bukan restoran. manifesto distinguishes the platform from merchants.
 - The closing mascot scene leads into a yellow wordmark footer with navigation and photographic credits.
 
@@ -55,7 +55,7 @@ Removed superseded `conversation-preview.tsx` and `merchant-card.tsx`. Public CT
 
 ## Assets
 
-All photographs are local, responsive, optimized through Next Image, and lazy-loaded below the fold. None is represented as Warung Babe's actual menu photography.
+All photographs are local, responsive, optimized through Next Image, and lazy-loaded below the fold. None is represented as Bakmi Effata's actual menu photography.
 
 | Photograph                               | Creator         | License        |
 | ---------------------------------------- | --------------- | -------------- |

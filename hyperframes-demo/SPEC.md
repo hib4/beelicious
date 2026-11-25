@@ -84,7 +84,7 @@ TIME: 57.67 s × 60 = 3460 frames. Music: "Digital Clouds" at 129 BPM, so 1 beat
 | chat | 3.72–17.67 | Five real exchanges: tenant (1), category (1), menu (2), quantity (2), cart (3). It ends with an iris from the 3. |
 | pickup | 17.67–24.19 | Parchment. The slot list; 1 picks "12.30", which grows; the confirm card; 1 = Konfirmasi & Bayar. |
 | bayar | 24.19–37.21 | Yellow. Order created; Rp60.000 slams (the one riser→impact); the QRIS instruction with the card; the verified message with its honesty line held ≥ 2 s. The order collapses to a slab. |
-| dapur | 37.21–46.51 | Parchment dashboard. The slab lands as the table row; the cursor opens it; Terima pesanan → Konfirmasi → Diterima; Mulai siapkan → Disiapkan; Tandai siap diambil → Siap diambil. Each step drops its real notification into the charcoal chat strip on the right. |
+| dapur | 37.21–46.51 | Parchment dashboard. The slab lands as the table row; the cursor opens it; Terima pesanan → confirm dialog → Konfirmasi → Diterima, shown once in full, with a push-in on the status. Then one click each: Mulai siapkan → Disiapkan; Tandai siap diambil → Siap diambil. Each step drops its real notification into the chat on the right. |
 | notif | 46.51–49.30 | The chat strip becomes the world: "Pesanan kamu sudah siap diambil!" at 2×. Match cut on 12.30. |
 | ambil | 49.30–53.95 | Yellow 12.30. Tandai sudah diambil → Selesai; "Pesan duluan." / "Ambil pas jamnya." |
 | akhir | 53.95–57.67 | Charcoal. The bee, TINGGAL CHAT!, the beelicious. wordmark wipe, "Mulai dari satu “Halo”."; hold. |

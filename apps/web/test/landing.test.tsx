@@ -15,7 +15,7 @@ describe('landing page', () => {
     );
     for (const id of ['cara-kerja', 'tenant', 'pengalaman', 'tentang'])
       expect(document.getElementById(id)).toBeInTheDocument();
-    expect(screen.getAllByText('Warung Babe').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Bakmi Effata').length).toBeGreaterThan(0);
     expect(screen.getByText('Contoh tenant pilot')).toBeInTheDocument();
     expect(
       screen.getByText(/foto asli tenant belum tersedia/),

@@ -69,7 +69,7 @@ for (const [index, tid] of [tenantId, otherTenant].entries()) {
   await p.tenant.create({
     data: {
       id: tid,
-      name: index ? 'Tenant Kedua' : 'Warung Babe — Data Uji',
+      name: index ? 'Tenant Kedua' : 'Bakmi Effata — Data Uji',
       slug: `dashboard-e2e-${tid}`,
     },
   });
